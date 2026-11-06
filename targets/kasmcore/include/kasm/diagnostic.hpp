@@ -20,6 +20,7 @@
 
 class KasmcoreDiagnostic : public Diagnostic {
 public:
-    KasmcoreDiagnostic(const char* message, Span span) : Diagnostic(message, span) {}
+    KasmcoreDiagnostic(const char* message, const char* file, int line, int column)
+        : Diagnostic(message, file, line, column) {}
     void report() const override;
 };

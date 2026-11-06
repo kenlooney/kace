@@ -15,7 +15,9 @@ int main(int argc, char* argv[]) {
     }
     KasmcoreDiagnostic diag(
         "An example diagnostic",
-        Span{source.name.c_str(), 1, 1}
+        source.name.c_str(),
+        1,
+        1
     );
     diag.report();
 

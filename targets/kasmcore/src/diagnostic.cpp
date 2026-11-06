@@ -18,6 +18,9 @@
 #include <iostream>
 
 void KasmcoreDiagnostic::report() const {
-    Span span = getSpan();
-    std::cerr << "Error: " << getMessage() << " at " << span.file << ":" << span.line << ":" << span.column << std::endl;
+    if(getFile() && getLine() >= 0 && getColumn() >= 0)
+        std::cerr << "Error: " << getMessage() << " at " << getFile() << ":" << getLine() << ":" << getColumn() << std::endl;
+    else if(!getFile())
+        std::cerr << "Error: " << getMessage() << ":" << getLine() << ":" << getColumn() << std::endl;
+   
 }

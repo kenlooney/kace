@@ -14,24 +14,26 @@
  * GNU General Public License for more details.
  */
 #pragma once
-
-struct Span {
-    const char* file;
-    int line;
-    int column;
-};
+#include <string>
+#include "span.hpp"
 class Diagnostic {
 public:
     virtual ~Diagnostic() = default;
-    Diagnostic(const char* message, Span span) : message(message), span(span) {}
+    Diagnostic(const char* message, const char* file, int line, int column) 
+        : message(message), file(file), line(line), column(column) {}
     const char* getMessage() const { return message; }
-    Span getSpan() const { return span; }
+    int getLine() const { return line; }
+    int getColumn() const { return column; }
+    const char* getFile() const { return file.c_str(); }
     void setMessage(const char* newMessage) { message = newMessage; }
-    void setSpan(Span newSpan) { span = newSpan; }
+    
 
     virtual void report() const = 0;
 
 private:
     const char* message;
-    Span span;
+    int line;
+    int column;
+    std::string file;
+    
 };
