@@ -1,0 +1,128 @@
+{
+    "version": 8,
+    "configurePresets": [
+        {
+            "name": "windows-debug",
+            "displayName": "Windows Debug - Visual Studio Community 2026 Release - amd64",
+            "description": "Using compilers for Visual Studio 18 2026 (x64 architecture)",
+            "generator": "Visual Studio 18 2026",
+            "toolset": "host=x64",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
+                "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL",
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe",
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "windows-release",
+            "displayName": "Windows Release - Visual Studio Community 2026 Release - amd64 - Release",
+            "description": "Using compilers for Visual Studio 18 2026 (x64 architecture) - Release",
+            "generator": "Visual Studio 18 2026",
+            "toolset": "host=x64",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
+                "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL",
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe",
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "GCC-debug",
+            "displayName": "GCC - Linux / WSL2 - Debug",
+            "description": "Build with GCC and Unix Makefiles on Linux or WSL2",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "VCPKG_TARGET_TRIPLET": "x64-linux",
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "GCC-release",
+            "displayName": "GCC - Linux / WSL2 - Release",
+            "description": "Build with GCC and Unix Makefiles on Linux or WSL2",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "VCPKG_TARGET_TRIPLET": "x64-linux",
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "windows-debug",
+            "displayName": "Windows - Visual Studio Community 2026 Release - amd64 - Debug",
+            "configurePreset": "windows-debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "windows-release",
+            "displayName": "Windows - Visual Studio Community 2026 Release - amd64 - Release",
+            "configurePreset": "windows-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "GCC-debug",
+            "displayName": "GCC - Linux / WSL2 - Debug",
+            "configurePreset": "GCC-debug"
+        },
+        {
+            "name": "GCC-release",
+            "displayName": "GCC - Linux / WSL2 - Release",
+            "configurePreset": "GCC-release"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "windows-debug",
+            "configurePreset": "windows-debug",
+            "configuration": "Debug",
+            "output": {
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "windows-release",
+            "configurePreset": "windows-release",
+            "configuration": "Release",
+            "output": {
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "GCC-debug",
+            "configurePreset": "GCC-debug",
+            "output": {
+                "verbosity": "verbose"
+            }
+        }
+    ]
+}

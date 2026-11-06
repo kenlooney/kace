@@ -1,0 +1,170 @@
+name: Releases
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Read the CMake project version
+        run: cmake -S . -B build -DBUILD_TESTING=OFF
+      - name: Compute release identifier
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(cat build/kace-version.txt)"
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+){0,3}$ ]]; then
+            echo "::error::Invalid CMake project version: $version"
+            exit 1
+          fi
+          date="$(date -u +%m%d%Y)"
+          if [[ "$GITHUB_REF_NAME" == "dev" ]]; then
+            echo "tag=kace-dev-${version}-${date}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=kace-${version}-${date}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: metadata
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            generator: TGZ
+            extension: tar.gz
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            generator: TGZ
+            extension: tar.gz
+          - platform: windows-x64
+            runner: windows-2022
+            architecture: x64
+            generator: ZIP
+            extension: zip
+          - platform: windows-arm64
+            runner: windows-11-arm
+            architecture: ARM64
+            generator: ZIP
+            extension: zip
+          - platform: macos-x64
+            runner: macos-15-intel
+            generator: TGZ
+            extension: tar.gz
+          - platform: macos-arm64
+            runner: macos-15
+            generator: TGZ
+            extension: tar.gz
+    defaults:
+      run:
+        shell: bash
+    env:
+      PACKAGE_NAME: ${{ needs.metadata.outputs.tag }}-${{ matrix.platform }}
+      WINDOWS_ARCHITECTURE: ${{ matrix.architecture }}
+      PACKAGE_GENERATOR: ${{ matrix.generator }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure
+        run: |
+          set -euo pipefail
+          options=()
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            options+=(-A "$WINDOWS_ARCHITECTURE")
+            # Ship a standalone executable without requiring the MSVC redistributable.
+            options+=("-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded")
+          fi
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF "${options[@]}"
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Package installed files
+        run: |
+          cpack --config build/CPackConfig.cmake -C Release -G "$PACKAGE_GENERATOR" \
+            -D "CPACK_PACKAGE_FILE_NAME=$PACKAGE_NAME" \
+            -D CPACK_INCLUDE_TOPLEVEL_DIRECTORY=ON -B dist
+      - name: Upload archive
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.platform }}
+          path: dist/${{ env.PACKAGE_NAME }}.${{ matrix.extension }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [metadata, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
+      PRERELEASE: ${{ needs.metadata.outputs.prerelease }}
+    steps:
+      - name: Download all platform archives
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish release
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(dist/*.zip dist/*.tar.gz)
+          if [[ "${#assets[@]}" -ne 6 ]]; then
+            echo "::error::Expected six platform archives, found ${#assets[@]}"
+            exit 1
+          fi
+
+          # An older queued run must not replace a release from a newer push.
+          head="$(gh api "repos/$GH_REPO/git/ref/heads/$GITHUB_REF_NAME" --jq '.object.sha')"
+          if [[ "$head" != "$GITHUB_SHA" ]]; then
+            echo "::notice::Skipping publication because this branch has a newer commit."
+            exit 0
+          fi
+
+          existing="$(gh api --paginate "repos/$GH_REPO/releases?per_page=100" \
+            --jq '.[] | select(.tag_name == env.RELEASE_TAG) | {id, immutable}')"
+          if [[ -n "$existing" ]]; then
+            if [[ "$(jq -r '.immutable' <<< "$existing")" == "true" ]]; then
+              echo "::error::Same-day replacement requires mutable releases. Disable release immutability or use a unique identifier."
+              exit 1
+            fi
+            gh release delete "$RELEASE_TAG" --yes --cleanup-tag
+          fi
+
+          options=(--draft --target "$GITHUB_SHA" --title "$RELEASE_TAG" --generate-notes)
+          if [[ "$PRERELEASE" == "true" ]]; then
+            options+=(--prerelease --latest=false --notes "Unstable development snapshot from dev. Built from commit $GITHUB_SHA.")
+          else
+            options+=(--latest --notes "Stable release from main. Built from commit $GITHUB_SHA.")
+          fi
+          gh release create "$RELEASE_TAG" "${assets[@]}" "${options[@]}"
+
+          # Publish only after every asset has uploaded successfully.
+          if [[ "$PRERELEASE" == "true" ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
+          fi
