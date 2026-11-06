@@ -17,6 +17,9 @@
 
 #include <kace/aliastable.hpp>
 #include <kace/lexer.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <string>
 #include <vector>
 
 class OperatorTable : public AliasTable {
