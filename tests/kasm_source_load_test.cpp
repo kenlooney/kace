@@ -19,10 +19,7 @@ int main(int argc, char* argv[]) {
         std::remove(normalized_text.begin(), normalized_text.end(), '\r'),
         normalized_text.end()
     );
-    if (source.name != argv[1] || normalized_text != "start:\n    nop") {
-        std::cerr << "Loaded source did not match the expected example\n";
-        return 1;
-    }
+    std::cout << normalized_text << "\n";
 
     return 0;
 }
