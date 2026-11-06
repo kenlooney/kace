@@ -18,9 +18,9 @@
 #include "kace/diagnostic.hpp"
 #include <iostream>
 
-class KasmcoreDiagnostic : public Diagnostic {
+class KasmDiagnostic : public Diagnostic {
 public:
-    KasmcoreDiagnostic(const char* message, const char* file, int line, int column)
+    KasmDiagnostic(const char* message, const char* file, int line, int column)
         : Diagnostic(message, file, line, column) {}
     void report() const override;
 };

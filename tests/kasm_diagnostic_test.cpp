@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "Could not open: " << argv[1] << "\n";
         return 1;
     }
-    KasmcoreDiagnostic diag(
+    KasmDiagnostic diag(
         "An example diagnostic",
         source.name.c_str(),
         1,

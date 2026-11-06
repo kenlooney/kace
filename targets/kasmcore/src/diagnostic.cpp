@@ -17,7 +17,7 @@
 #include "kasm/diagnostic.hpp"
 #include <iostream>
 
-void KasmcoreDiagnostic::report() const {
+void KasmDiagnostic::report() const {
     if(getFile() && getLine() >= 0 && getColumn() >= 0)
         std::cerr << "Error: " << getMessage() << " at " << getFile() << ":" << getLine() << ":" << getColumn() << std::endl;
     else if(!getFile())
