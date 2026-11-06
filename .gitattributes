@@ -1,0 +1,14 @@
+# Normalize text files to LF in the repository and working tree.
+* text=auto eol=lf
+
+# Common binary files must not be modified.
+*.dll binary
+*.exe binary
+*.lib binary
+*.pdb binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.zip binary
+
