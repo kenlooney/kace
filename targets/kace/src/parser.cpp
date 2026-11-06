@@ -13,196 +13,385 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#include <kace/parser.hpp>
 #include <kace/integers.hpp>
-#include <kace/aliastable.hpp>
+#include <kace/parser.hpp>
+#include <sstream>
+#include <kace/source.hpp>
+#include <sstream>
+
 void Parser::add_operator_alias(
-    const std::string& symbol,
-    const std::string& value
-) {
-    if (symbol.empty() || value.empty()) {
+    const std::string &symbol,
+    const std::string &value)
+{
+    if (symbol.empty() || value.empty() || symbol == value)
+    {
         return;
     }
-    if (symbol == value) {
-        return;
-    }
-    if(symbol == "+")
-        ops_table.addto_alias("+", value);
-    else if(symbol == "-")
-        ops_table.addto_alias("-", value);
-    else if(symbol == "*")
-        ops_table.addto_alias("*", value);
-    else if(symbol == "/")
-        ops_table.addto_alias("/", value);
-    else if(symbol == "%")
-        ops_table.addto_alias("%", value);
-    else if(symbol == "(")
-        ops_table.addto_alias("(", value);
-    else if(symbol == ")")
-        ops_table.addto_alias(")", value);
+
+    ops_table.addto_alias(symbol, value);
 }
 
-bool Parser::number(std::uint64_t& value, std::string& error) {
-    const Alias* open_paren_alias = ops_table.get_operator_alias("(");
-    const Alias* close_paren_alias = ops_table.get_operator_alias(")");
+bool Parser::number(std::size_t &node, std::string &error)
+{
+    const Alias *open_alias = ops_table.get_operator_alias("(");
+    const Alias *close_alias = ops_table.get_operator_alias(")");
 
-   if (pos < tokens.size()) {
-       for (const std::string& alias : open_paren_alias->values) {
-           if (tokens[pos].text == alias) {
-               ++pos;
-               if (!sum(value, error)) return false;
-               if (pos < tokens.size()) {
-                   for (const std::string& close_alias : close_paren_alias->values) {
-                       if (tokens[pos].text == close_alias) {
-                           ++pos;
-                           return true;
-                       }
-                   }
-               }
-               error = "Expected a closing parenthesis";
-               return false;
-           }
-       }
-   }
-
-   if(pos >= tokens.size() || tokens[pos].kind != "integer") {
-       error = "Expected an integer";
-       return false;
-   }
-   if(!parse_integer(tokens[pos].text, value)) {
-       error = "Invalid integer: " + tokens[pos].text;
-       return false;
-   }
-   ++pos;
-   return true;
-}
-
-bool Parser::run(std::uint64_t& value, std::string& error) {
-        if (!sum(value, error)) return false;
-        if (pos != tokens.size()) {
-            error = "Unexpected token: " + tokens[pos].text;
-            return false;
-        }
-        return true;
-    }
-
-bool Parser::sum(std::uint64_t& value, std::string& error) {
-    const Alias* add_alias = ops_table.get_operator_alias("+");
-    const Alias* sub_alias = ops_table.get_operator_alias("-");
-    if(!product(value, error)) {
+    if (open_alias == nullptr || close_alias == nullptr)
+    {
+        error = "Parser parenthesis aliases are incomplete";
         return false;
     }
-    while(pos < tokens.size())
+
+    if (pos < tokens.size())
     {
-        // Check for addition operator with operator alias
-        bool matched = false;
-        for(const std::string& alias : add_alias->values) {
-            if(pos < tokens.size() && tokens[pos].text == alias) {
-                ++pos;
-                std::uint64_t rhs;
-                if(!product(rhs, error)) {
-                    return false;
-                }
-                value += rhs;
-                matched = true;
-                break;
+        for (const std::string &alias : open_alias->values)
+        {
+            if (tokens[pos].text != alias)
+            {
+                continue;
             }
-        }
-        if(!matched) {
-            for(const std::string& alias : sub_alias->values) {
-                if(pos < tokens.size() && tokens[pos].text == alias) {
-                    ++pos;
-                    std::uint64_t rhs;
-                    if(!product(rhs, error)) {
-                        return false;
+
+            ++pos;
+            if (!sum(node, error))
+            {
+                return false;
+            }
+
+            if (pos < tokens.size())
+            {
+                for (const std::string &close : close_alias->values)
+                {
+                    if (tokens[pos].text == close)
+                    {
+                        ++pos;
+                        return true;
                     }
-                    value -= rhs;
-                    matched = true;
-                    break;
                 }
             }
-        }
-        if(!matched) {
-            break;
+
+            error = "Expected a closing parenthesis";
+            return false;
         }
     }
+
+    if (pos >= tokens.size() || tokens[pos].kind != "integer")
+    {
+        error = "Expected an integer";
+        return false;
+    }
+
+    std::uint64_t value = 0;
+    if (!parse_integer(tokens[pos].text, value))
+    {
+        error = "Invalid integer: " + tokens[pos].text;
+        return false;
+    }
+
+    node = tree->nodes.size();
+    tree->nodes.push_back(Node{"number", value, node, node});
+    ++pos;
     return true;
 }
 
-bool Parser::product(std::uint64_t& value, std::string& error) {
-    const Alias* mul_alias = ops_table.get_operator_alias("*");
-    const Alias* div_alias = ops_table.get_operator_alias("/");
-    const Alias* mod_alias = ops_table.get_operator_alias("%");
-    if(!number(value, error)) {
+bool Parser::sum(std::size_t &node, std::string &error)
+{
+    const Alias *add_alias = ops_table.get_operator_alias("+");
+    const Alias *sub_alias = ops_table.get_operator_alias("-");
+    if (add_alias == nullptr || sub_alias == nullptr)
+    {
+        error = "Parser sum aliases are incomplete";
         return false;
     }
-    while(pos < tokens.size())
+
+    if (!product(node, error))
     {
-        bool matched = false;
-        for(const std::string& alias : mul_alias->values) {
-            if(pos < tokens.size() && tokens[pos].text == alias) {
-                ++pos;
-                std::uint64_t rhs;
-                if(!number(rhs, error)) {
-                    return false;
-                }
-                value *= rhs;
-                matched = true;
+        return false;
+    }
+
+    while (pos < tokens.size())
+    {
+        const Alias *matched_alias = nullptr;
+        std::string operation;
+
+        for (const std::string &alias : add_alias->values)
+        {
+            if (tokens[pos].text == alias)
+            {
+                matched_alias = add_alias;
+                operation = "+";
                 break;
             }
         }
-        if(!matched) {
-            for(const std::string& alias : div_alias->values) {
-                if(pos < tokens.size() && tokens[pos].text == alias) {
-                    ++pos;
-                    std::uint64_t rhs;
-                    if(!number(rhs, error)) {
-                        return false;
-                    }
-                    if(rhs == 0) {
-                        error = "Division by zero";
-                        return false;
-                    }
-                    value /= rhs;
-                    matched = true;
+        if (matched_alias == nullptr)
+        {
+            for (const std::string &alias : sub_alias->values)
+            {
+                if (tokens[pos].text == alias)
+                {
+                    matched_alias = sub_alias;
+                    operation = "-";
                     break;
                 }
             }
         }
-        if(!matched) {
-            for(const std::string& alias : mod_alias->values) {
-                if(pos < tokens.size() && tokens[pos].text == alias) {
-                    ++pos;
-                    std::uint64_t rhs;
-                    if(!number(rhs, error)) {
-                        return false;
-                    }
-                    if(rhs == 0) {
-                        error = "Modulo by zero";
-                        return false;
-                    }
-                    value %= rhs;
-                    matched = true;
-                    break;
-                }
-            }
-        }
-        if(!matched) {
+        if (matched_alias == nullptr)
+        {
             break;
         }
+
+        ++pos;
+        std::size_t right = 0;
+        if (!product(right, error))
+        {
+            return false;
+        }
+
+        const std::size_t left = node;
+        node = tree->nodes.size();
+        tree->nodes.push_back(Node{operation, 0, left, right});
     }
+
+    return true;
+}
+
+bool Parser::product(std::size_t &node, std::string &error)
+{
+    const Alias *mul_alias = ops_table.get_operator_alias("*");
+    const Alias *div_alias = ops_table.get_operator_alias("/");
+    const Alias *mod_alias = ops_table.get_operator_alias("%");
+    if (mul_alias == nullptr || div_alias == nullptr || mod_alias == nullptr)
+    {
+        error = "Parser product aliases are incomplete";
+        return false;
+    }
+
+    if (!number(node, error))
+    {
+        return false;
+    }
+
+    while (pos < tokens.size())
+    {
+        std::string operation;
+        const Alias *aliases = nullptr;
+
+        for (const std::string &alias : mul_alias->values)
+        {
+            if (tokens[pos].text == alias)
+            {
+                operation = "*";
+                aliases = mul_alias;
+                break;
+            }
+        }
+        if (aliases == nullptr)
+        {
+            for (const std::string &alias : div_alias->values)
+            {
+                if (tokens[pos].text == alias)
+                {
+                    operation = "/";
+                    aliases = div_alias;
+                    break;
+                }
+            }
+        }
+        if (aliases == nullptr)
+        {
+            for (const std::string &alias : mod_alias->values)
+            {
+                if (tokens[pos].text == alias)
+                {
+                    operation = "%";
+                    aliases = mod_alias;
+                    break;
+                }
+            }
+        }
+        if (aliases == nullptr)
+        {
+            break;
+        }
+
+        ++pos;
+        std::size_t right = 0;
+        if (!number(right, error))
+        {
+            return false;
+        }
+
+        const std::size_t left = node;
+        node = tree->nodes.size();
+        tree->nodes.push_back(Node{operation, 0, left, right});
+    }
+
+    return true;
+}
+
+bool Parser::run(std::uint64_t &value, std::string &error)
+{
+    tree->nodes.clear();
+    tree->root = 0;
+    pos = 0;
+
+    if (!sum(tree->root, error))
+    {
+        return false;
+    }
+    if (pos != tokens.size())
+    {
+        error = "Unexpected token: " + tokens[pos].text;
+        return false;
+    }
+
+    return evaluate(*tree, tree->root, value, error);
+}
+
+bool Parser::evaluate(
+    const Expression &expression,
+    std::size_t node,
+    std::uint64_t &value,
+    std::string &error)
+{
+    if (node >= expression.nodes.size())
+    {
+        error = "Invalid expression node";
+        return false;
+    }
+
+    const Node &current = expression.nodes[node];
+    if (current.kind == "number")
+    {
+        value = current.value;
+        return true;
+    }
+
+    std::uint64_t left = 0;
+    std::uint64_t right = 0;
+    if (!evaluate(expression, current.left, left, error) ||
+        !evaluate(expression, current.right, right, error))
+    {
+        return false;
+    }
+
+    if (current.kind == "+")
+    {
+        value = left + right;
+    }
+    else if (current.kind == "-")
+    {
+        value = left - right;
+    }
+    else if (current.kind == "*")
+    {
+        value = left * right;
+    }
+    else if (current.kind == "/")
+    {
+        if (right == 0)
+        {
+            error = "Division by zero";
+            return false;
+        }
+        value = left / right;
+    }
+    else if (current.kind == "%")
+    {
+        if (right == 0)
+        {
+            error = "Modulo by zero";
+            return false;
+        }
+        value = left % right;
+    }
+    else
+    {
+        error = "Unknown expression operator: " + current.kind;
+        return false;
+    }
+
     return true;
 }
 
 bool Parser::parse_expression(
-    std::uint64_t& value,
-    std::string& error
-) {
+    Expression &expression,
+    std::string &error)
+{
+    if (tree != &expression)
+    {
+        expression = *tree;
+        tree = &expression;
+    }
+
+    std::uint64_t value = 0;
     return run(value, error);
 }
 
-bool parse_expression(const std::vector<Token>& tokens,
-                      std::uint64_t& value, std::string& error) {
-    Parser parser(tokens);
+bool Parser::parse_expression(
+    Expression &expression,
+    std::uint64_t &value,
+    std::string &error)
+{
+    if (tree != &expression)
+    {
+        expression = *tree;
+        tree = &expression;
+    }
+    return run(value, error);
+}
+
+bool Parser::parse_expression(
+    std::uint64_t &value,
+    std::string &error)
+{
+    return run(value, error);
+}
+
+bool Parser::parse(Source &source, std::string &error)
+{
+    std::vector<Statement> statements;
+    std::istringstream input(source.text);
+
+    std::string line_text;
+    std::size_t line_number = 1;
+    while (std::getline(input, line_text))
+    {
+        if (line_text.empty())
+        {
+            ++line_number;
+            continue;
+        }
+
+        Statement statement;
+        statement.line = line_number;
+        std::istringstream line_stream(line_text);
+        std::vector<Token> line_tokens;
+        Token token;
+        while (line_stream >> token.text)
+        {
+            line_tokens.push_back(token);
+        }
+
+        Parser line_parser(line_tokens, statement.expression);
+        std::uint64_t value = 0;
+        if (!line_parser.run(value, error))
+        {
+            return false;
+        }
+
+        statements.push_back(statement);
+        ++line_number;
+    }
+
+    return true;
+}
+
+bool parse_expression(
+    const std::vector<Token> &tokens,
+    Expression &expression,
+    std::uint64_t &value,
+    std::string &error)
+{
+    Parser parser(tokens, expression);
     return parser.run(value, error);
 }
