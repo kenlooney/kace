@@ -1,1 +1,1 @@
-add_executable(kasm)
+add_subdirectory(kasm)

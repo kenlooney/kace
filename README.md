@@ -31,13 +31,12 @@ Release/tag rules must allow creation and same-day deletion/recreation of
 `kace-*` tags. **Release immutability must be disabled** for same-day replacement.
 No additional release secret is needed.
 
-### Current build prerequisite
+### Adding targets
 
-The application source files still need to be added: `targets/CMakeLists.txt`
-currently declares `kasm` without any sources, so CMake generation fails. The
-workflow deliberately does not create placeholder application code. Add the
-sources to that target (or wire the existing `targets/kasm/CMakeLists.txt` into
-the build with its sources) before expecting successful releases.
+Register target subdirectories in `targets/CMakeLists.txt`, as with
+`add_subdirectory(kasm)`. Define each target and its sources in that subdirectory.
+Add installation rules for new executables and shared libraries so CPack includes
+them in release archives.
 
 Release builds currently set `BUILD_TESTING=OFF` because no `tests` directory is
 present. Once tests exist, enable them and add a CTest step before packaging.
