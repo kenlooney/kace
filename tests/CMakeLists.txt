@@ -7,6 +7,9 @@ target_link_libraries(kasm_diagnostic_test PRIVATE kasmcore)
 
 add_executable(display_tokens_test display_tokens_test.cpp)
 target_link_libraries(display_tokens_test PRIVATE kasmcore)
+
+add_executable(integer_parsing_test integer_parsing_test.cpp)
+target_link_libraries(integer_parsing_test PRIVATE kace)
 # Tests
 add_test(
   NAME kasm_source_load_test
@@ -27,4 +30,8 @@ add_test(
   NAME display_tokens_test_tokens
   COMMAND $<TARGET_FILE:display_tokens_test>
           "${CMAKE_SOURCE_DIR}/examples/tokens.asm"
+)
+add_test(
+  NAME integer_parsing_test
+  COMMAND $<TARGET_FILE:integer_parsing_test>
 )

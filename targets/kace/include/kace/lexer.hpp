@@ -28,6 +28,12 @@ class Lexer {
     public:
     virtual ~Lexer() = default;
     public:
+    bool is_letter(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+    bool is_digit(char c) {
+        return c >= '0' && c <= '9';
+    }
     virtual std::vector<Token> tokenize(const std::string& input) = 0;
     void clearTokens() {
         tokens.clear();
