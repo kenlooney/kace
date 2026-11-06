@@ -2,6 +2,7 @@
 #include "kace/source.hpp"
 #include "kace/statement.hpp"
 #include "kace/semantic.hpp"
+#include "kace/loader.hpp"
 #include "kasm/diagnostic.hpp"
 #include "kasm/kasmparser.hpp"
 #include <iostream>
@@ -12,13 +13,42 @@
 #include <iomanip>
 #include <kace/source.hpp>
 #include <string_view>
+#ifdef _WIN32
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 
+std::filesystem::path executableDirectory(const char* argv0)
+{
+#ifdef _WIN32
+    std::wstring path(32768, L'\0');
+    const DWORD size = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+    if (size > 0 && size < path.size())
+    {
+        path.resize(size);
+        return std::filesystem::path(path).parent_path();
+    }
+#elif defined(__APPLE__)
+    uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);
+    std::string path(size, '\0');
+    if (_NSGetExecutablePath(path.data(), &size) == 0)
+        return std::filesystem::canonical(path.c_str()).parent_path();
+#elif defined(__linux__)
+    std::error_code error;
+    const auto path = std::filesystem::read_symlink("/proc/self/exe", error);
+    if (!error) return path.parent_path();
+#endif
+    return std::filesystem::absolute(argv0).parent_path();
+}
 struct CommandLine
 {
     std::vector<std::string_view> arguments;
     std::vector<std::string_view> options;
     std::string_view input;
     std::string_view output;
+    std::string_view cpu = "x86";
     std::string error;
 };
 
@@ -77,6 +107,29 @@ CommandLine parseCommandLine(int argc, char *argv[])
                 return result;
             }
         }
+        else if (!optionsEnded && (arg == "-c" || arg == "--cpu" ||
+                                   arg.substr(0, 6) == "--cpu="))
+        {
+            if (arg.substr(0, 6) == "--cpu=")
+            {
+                std::string cpuStr = std::string(arg.substr(6));
+                if (cpuStr.empty())
+                {
+                    result.error = "missing CPU for " + std::string(arg);
+                    return result;
+                }
+                result.cpu = arg.substr(6);
+            }
+            else if (i + 1 < argc && argv[i + 1][0] != '-')
+            {
+                result.cpu = argv[++i];
+            }
+            else
+            {
+                result.error = "missing CPU for " + std::string(arg);
+                return result;
+            }
+        }
         else if (!optionsEnded && arg.size() > 1 && arg.front() == '-')
         {
             result.options.push_back(arg);
@@ -98,6 +151,7 @@ void showHelpMessage()
                  "  -h, --help   Show this help message\n"
                  "  -i, --input  FILE  Parse an input file (also --input=FILE)\n"
                  "  -o, --output FILE  Store the result in a file (also --output=FILE)\n"
+                 "  -c, --cpu    CPU  Select a CPU plugin by name (default: x86)\n"
                  "  --          Treat remaining tokens as arguments\n"
                  "\nKASM's command-line workflow is under development.\n";
 }
@@ -151,13 +205,28 @@ int main(int argc, char *argv[])
     }
     if (!commandLine.output.empty())
     {
+        const std::string cpuName(commandLine.cpu);
+        if (cpuName.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") != std::string::npos)
+        {
+            std::cerr << "kasm: invalid CPU plugin name: " << cpuName << "\n";
+            return 1;
+        }
+        const auto pluginPath = executableDirectory(argv[0]) /
+            (std::string(KACE_PLUGIN_PREFIX) + cpuName + KACE_PLUGIN_SUFFIX);
+        Loader loader;
+        if (!loader.open(pluginPath.string(), error))
+        {
+            std::cerr << "kasm: could not load CPU plugin '" << cpuName << "' ("
+                      << pluginPath.string() << "): " << error << "\n";
+            return 1;
+        }
         std::vector<std::uint8_t> bytes;
         for (const Statement &statement : statements)
         {
             std::uint8_t byte = 0;
-            if (!check_byte(statement, byte, error))
+            if (!encode_statement(statement, *loader.cpu(), byte, error))
             {
-                std::cerr << error << "\n";
+                std::cerr << commandLine.input << ":" << statement.line << ": " << error << "\n";
                 return 1;
             }
             bytes.push_back(byte);
@@ -176,6 +245,5 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-
     return 0;
 }

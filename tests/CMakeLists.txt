@@ -19,7 +19,16 @@ target_link_libraries(multi_expressions_test PRIVATE kasmcore)
 
 add_executable(kasm_collect_bytes_test kasm_collect_bytes_test.cpp)
 target_link_libraries(kasm_collect_bytes_test PRIVATE kasmcore)
+
+add_executable(x86_plugin_test x86_plugin_test.cpp)
+target_link_libraries(x86_plugin_test PRIVATE x86)
+
+add_executable(cpu_loader_test cpu_loader_test.cpp)
+target_link_libraries(cpu_loader_test PRIVATE kace)
 # Tests
+add_test(NAME x86_plugin_test COMMAND $<TARGET_FILE:x86_plugin_test>)
+add_test(NAME cpu_loader_test COMMAND $<TARGET_FILE:cpu_loader_test>
+  $<TARGET_FILE:x86> $<TARGET_FILE:kace>)
 add_test(
   NAME kasm_source_load_test
   COMMAND $<TARGET_FILE:kasm_source_load_test>
@@ -58,4 +67,11 @@ add_test(
   NAME kasm_collect_bytes_test
   COMMAND $<TARGET_FILE:kasm_collect_bytes_test>
           "${CMAKE_SOURCE_DIR}/examples/multiexpressions.asm"
+)
+add_test(
+  NAME kasm_cpu_cli_test
+  COMMAND ${CMAKE_COMMAND}
+          -DKASM=$<TARGET_FILE:kasm>
+          -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/kasm_cpu_cli_test.cmake
 )

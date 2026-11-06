@@ -111,6 +111,10 @@ public:
                 tokens.begin() + operand_start,
                 tokens.end()
             );
+            if (operands.empty() && statement.type == DataType::None) {
+                statements.push_back(statement);
+                continue;
+            }
             KasmParser line_parser(operands);
             if (!line_parser.parse_expression(
                     statement.expression,
