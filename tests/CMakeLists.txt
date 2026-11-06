@@ -10,6 +10,9 @@ target_link_libraries(display_tokens_test PRIVATE kasmcore)
 
 add_executable(integer_parsing_test integer_parsing_test.cpp)
 target_link_libraries(integer_parsing_test PRIVATE kace)
+
+add_executable(kasm_parser_expression_test kasm_parser_expression_test.cpp)
+target_link_libraries(kasm_parser_expression_test PRIVATE kasmcore)
 # Tests
 add_test(
   NAME kasm_source_load_test
@@ -34,4 +37,9 @@ add_test(
 add_test(
   NAME integer_parsing_test
   COMMAND $<TARGET_FILE:integer_parsing_test>
+)
+add_test(
+  NAME kasm_parser_expression_test
+  COMMAND $<TARGET_FILE:kasm_parser_expression_test>
+          "${CMAKE_SOURCE_DIR}/examples/expressions.asm"
 )

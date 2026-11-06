@@ -54,3 +54,16 @@ const Alias* AliasTable::get_alias(
 ) const {
     return resolve_alias(symbol);
 }
+
+void AliasTable::addto_alias(
+    const std::string& symbol,
+    const std::string& value
+) {
+    for (auto& alias : aliases_) {
+        if (alias.symbol == symbol) {
+            alias.values.push_back(value);
+            return;
+        }
+    }
+    aliases_.push_back(Alias{symbol, {value}});
+}
