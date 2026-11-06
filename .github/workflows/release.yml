@@ -88,13 +88,14 @@ jobs:
       - name: Configure
         run: |
           set -euo pipefail
-          options=()
+          # Bash 3.2 on macOS rejects empty array expansion with nounset enabled.
+          options=(-S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF)
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             options+=(-A "$WINDOWS_ARCHITECTURE")
             # Ship a standalone executable without requiring the MSVC redistributable.
             options+=("-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded")
           fi
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF "${options[@]}"
+          cmake "${options[@]}"
       - name: Build
         run: cmake --build build --config Release --parallel
       - name: Package installed files
