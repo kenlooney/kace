@@ -15,4 +15,6 @@
  */
 #pragma once
 #include "statement.hpp"
+#include "cpu.hpp"
 bool check_byte(const Statement& statement, std::uint8_t& byte, std::string& error);
+bool encode_statement(const Statement& statement, const Cpu& cpu, std::uint8_t& byte, std::string& error);

@@ -29,7 +29,7 @@ if(UNIX AND NOT APPLE)
   set_target_properties(kasmcore PROPERTIES INSTALL_RPATH "$ORIGIN")
   set_target_properties(kace PROPERTIES INSTALL_RPATH "$ORIGIN")
 endif()
-install(TARGETS kasm kasmcore kace
+install(TARGETS kasm kasmcore kace x86
   RUNTIME DESTINATION .
   LIBRARY DESTINATION .)
 install(FILES README.md LICENSE DESTINATION .)
