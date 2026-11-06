@@ -33,6 +33,10 @@ public:
         const std::string& symbol,
         const std::vector<std::string>& values
     );
+    void addto_alias(
+        const std::string& symbol,
+        const std::string& value
+    );
 
     const Alias* resolve_alias(
         const std::string& symbol
