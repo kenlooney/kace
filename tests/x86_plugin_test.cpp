@@ -41,5 +41,22 @@ int main() {
         std::cerr << "x86 accepted invalid immediate operands\n";
         return 1;
     }
+    const std::vector<std::uint8_t> instructions{0x90, 0xB0, 42};
+    std::size_t offset = 0;
+    std::string text;
+    if (!cpu.decode(instructions, offset, text) || text != "nop" || offset != 1 ||
+        !cpu.decode(instructions, offset, text) || text != "mov al, 42" || offset != 3 ||
+        cpu.decode(instructions, offset, text) || offset != 3) {
+        std::cerr << "x86 failed to decode instruction sequence\n";
+        return 1;
+    }
+    for (const std::vector<std::uint8_t> invalid :
+         {std::vector<std::uint8_t>{0xB0}, std::vector<std::uint8_t>{0xFF}}) {
+        offset = 0;
+        if (cpu.decode(invalid, offset, text) || offset != 0) {
+            std::cerr << "x86 accepted incomplete or unknown instruction\n";
+            return 1;
+        }
+    }
     return 0;
 }

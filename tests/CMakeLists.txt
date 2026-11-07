@@ -28,7 +28,10 @@ target_link_libraries(cpu_loader_test PRIVATE kace)
 
 add_executable(kasm_keyword_alias_test kasm_keyword_alias_test.cpp)
 target_link_libraries(kasm_keyword_alias_test PRIVATE kasmcore)
+add_executable(symbol_table_test symbol_table_test.cpp)
+target_link_libraries(symbol_table_test PRIVATE kace)
 # Tests
+add_test(NAME symbol_table_test COMMAND $<TARGET_FILE:symbol_table_test>)
 add_test(NAME x86_plugin_test COMMAND $<TARGET_FILE:x86_plugin_test>)
 add_test(NAME kasm_keyword_alias_test COMMAND $<TARGET_FILE:kasm_keyword_alias_test>)
 add_test(NAME cpu_loader_test COMMAND $<TARGET_FILE:cpu_loader_test>

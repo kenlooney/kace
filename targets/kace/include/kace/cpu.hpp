@@ -20,6 +20,7 @@
 class Cpu {
     public:
     virtual ~Cpu() = default;
+    // Encoding
     virtual bool encode_no_operand(const std::string& name, std::uint8_t& byte) const = 0;
     virtual bool encode_immediate(
         const std::string& name, 
@@ -28,4 +29,8 @@ class Cpu {
         std::vector<std::vector<std::uint8_t>>& bytes,
         std::string& error
     ) const = 0;
+    // Decoding
+    virtual bool decode(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const = 0;
+    
+
 };

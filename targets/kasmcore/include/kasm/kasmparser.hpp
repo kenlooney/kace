@@ -50,6 +50,7 @@ public:
         std::istringstream input(source.text);
         std::string line;
         std::size_t line_number = 0;
+        
 
         while (std::getline(input, line)) {
             ++line_number;
@@ -67,7 +68,8 @@ public:
             // Check for labels before identifiers
             if(tokens[0].kind == "label") {
                
-                std::cout << "Found label: " << statement.name << std::endl;
+                statement.kind = StatementKind::Label;
+                statements.push_back(statement);
                 continue;
             }
             
@@ -120,6 +122,7 @@ public:
                 }
             }
             if (statement.name == "define") {
+                statement.kind = StatementKind::Directive;
                 if (tokens.size() < 3 || tokens[1].kind != "identifier") {
                     error = source.name + ":" +
                         std::to_string(line_number) +

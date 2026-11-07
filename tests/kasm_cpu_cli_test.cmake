@@ -1,6 +1,6 @@
 set(input "${TEST_DIR}/cpu_cli_input.asm")
 set(output "${TEST_DIR}/cpu_cli_output.bin")
-file(WRITE "${input}" "nop\ndefine byte 42\ndefine_byte 7\nnop\n")
+file(WRITE "${input}" "start:\nnop\nmiddle:\ndefine byte 42\ndefine_byte 7\nnop\nend:\n")
 foreach(cpu_option IN ITEMS "--cpu=x86" "-c;x86" "")
   execute_process(COMMAND "${KASM}" ${cpu_option} -i "${input}" -o "${output}"
     WORKING_DIRECTORY "${TEST_DIR}" RESULT_VARIABLE result ERROR_VARIABLE error)

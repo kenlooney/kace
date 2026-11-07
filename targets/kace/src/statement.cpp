@@ -24,7 +24,7 @@ bool parse_statement(const std::vector<Token>& tokens,
         return false;
     }
     statement.name = tokens[0].text;
-    std::vector<Token> operands(tokens.begin() + 1, tokens.end());
+     std::vector<Token> operands(tokens.begin() + 1, tokens.end());
     Parser parser(operands, statement.expression);
     return parser.parse_expression(
         statement.expression,
