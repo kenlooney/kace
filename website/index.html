@@ -111,7 +111,10 @@
             <code>jump short</code>, or <code>goto short</code> to make the destination clear. Near and far jumps
             are still in development.
           </p>
-          <p>It’s a work in progress, with x86 support and decoding taking shape as the project grows.
+          <p>The KASM CLI can also disassemble supported x86 instructions into a <code>.dism</code> file.
+            Decoded jumps show their relative displacement; raw binaries don’t preserve the original label names.
+            Disassembly uses standard instruction names like <code>jmp</code>, even when the source used
+            an alias such as <code>jump</code> or <code>goto</code>.
           </p><a class="inline-link" href="#download">EXPLORE RELEASES <span>↗</span></a>
         </div>
         <div class="code-card">
@@ -121,6 +124,7 @@
           <pre><span class="muted">; forward and backward jumps</span>&#10;&#10;<span class="code-label">start:</span>&#10;    <span class="code-op">jmp short</span> done&#10;    <span class="code-op">nop</span>&#10;<span class="code-label">done:</span>&#10;    <span class="code-op">jmp short</span> start</pre>
           <div class="code-caption"><span>THE IDEA</span>
             <p>Output bytes: <code>EB 01 90 EB FB</code></p>
+            <p>Disassembled: <code>jmp 1</code> · <code>nop</code> · <code>jmp -5</code></p>
           </div>
         </div>
       </div>
@@ -142,9 +146,9 @@
               <!-- Add more CPU plugins as list items here. -->
               <li>
                 <div><strong>x86</strong><span>DEFAULT CPU</span></div>
-                <p>Currently supports encoding <code>nop</code> and short jumps through the assembler. The plugin also implements
-                  immediate <code>mov al</code> encoding and decoding for <code>nop</code> and <code>mov al</code>;
-                  those paths are still being connected to the CLI.</p>
+                <p>The assembler supports <code>nop</code> and short jumps. The CLI can disassemble
+                  <code>nop</code>, <code>mov al</code> with an immediate, and short jumps. The plugin can also
+                  encode immediate <code>mov al</code>, but that encoding is not yet connected to the CLI.</p>
               </li>
             </ul>
             <p class="plugin-note">Select the included plugin with <code>--cpu=x86</code> or <code>-c x86</code>. x86 is
