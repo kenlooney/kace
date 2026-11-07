@@ -21,6 +21,7 @@ struct Statement {
     DataType type = DataType::None;
     Expression expression;
     std::uint64_t value = 0;
+    std::string reg;
 };
 
 bool parse_statement(const std::vector<Token>& tokens, Statement& statement, std::string& error);
