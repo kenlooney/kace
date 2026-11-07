@@ -13,6 +13,8 @@
 #include <iomanip>
 #include <kace/source.hpp>
 #include <string_view>
+#include "kace/symbols.hpp"
+
 #ifdef _WIN32
 #include <windows.h>
 #elif defined(__APPLE__)
@@ -49,6 +51,7 @@ struct CommandLine
     std::string_view input;
     std::string_view output;
     std::string_view cpu = "x86";
+    bool disassemble = false;
     std::string error;
 };
 
@@ -84,6 +87,17 @@ CommandLine parseCommandLine(int argc, char *argv[])
                 result.error = "missing input file for " + std::string(arg);
                 return result;
             }
+        }
+        else if (!optionsEnded && (arg == "-d" || arg == "--disassemble"))
+        {
+            
+            if (result.disassemble)
+            {
+                result.error = "disassemble option specified more than once";
+                return result;
+            }
+            result.disassemble = true;
+            
         }
         else if (!optionsEnded && (arg == "-o" || arg == "--output" ||
                                    arg.substr(0, 9) == "--output="))
@@ -148,19 +162,33 @@ void showHelpMessage()
                  "\nCommands:\n"
                  "  help        Show this help message\n"
                  "\nOptions:\n"
-                 "  -h, --help   Show this help message\n"
-                 "  -i, --input  FILE  Parse an input file (also --input=FILE)\n"
-                 "  -o, --output FILE  Store the result in a file (also --output=FILE)\n"
-                 "  -c, --cpu    CPU  Select a CPU plugin by name (default: x86)\n"
+                 "  -h, --help          Show this help message\n"
+                 "  -i, --input  FILE   Input file to assemble or disassemble (also --input=FILE)\n"
+                 "  -o, --output FILE   Store the result in a file (also --output=FILE)\n"
+                 "  -c, --cpu    CPU    Select a CPU plugin by name (default: x86)\n"
+                 "  -d, --disassemble   Disassemble the input file\n"
                  "  --          Treat remaining tokens as arguments\n"
                  "\nKASM's command-line workflow is under development.\n";
+}
+
+enum class ClientMode
+{
+    Assemble,
+    Disassemble
+};
+
+void disassemble(const std::string &file)
+{
+    std::cout << "Disassembling file: " << file << "\n";
 }
 int main(int argc, char *argv[])
 {
     const auto commandLine = parseCommandLine(argc, argv);
+    ClientMode mode = commandLine.disassemble ? ClientMode::Disassemble : ClientMode::Assemble;
+    
 
     if (!commandLine.error.empty())
-    {
+    {   
         std::cerr << "kasm: " << commandLine.error << "\n";
         return 1;
     }
@@ -172,6 +200,7 @@ int main(int argc, char *argv[])
         {
             showHelp = true;
         }
+
     }
     if (showHelp)
     {
@@ -193,6 +222,12 @@ int main(int argc, char *argv[])
         {
             std::cerr << "kasm: could not open input file: " << commandLine.input << "\n";
             return 1;
+        }
+        if (mode == ClientMode::Disassemble)
+        {
+            // Disassemble input file
+            disassemble(std::string(commandLine.input));
+            return 0; // Exit after disassembling
         }
         const std::vector<Token> tokens;
         KasmParser parser(tokens);
@@ -220,9 +255,18 @@ int main(int argc, char *argv[])
                       << pluginPath.string() << "): " << error << "\n";
             return 1;
         }
+        
+        SymbolTable symbolTable;
         std::vector<std::uint8_t> bytes;
-        for (const Statement &statement : statements)
+        for (Statement &statement : statements)
         {
+            statement.offset = bytes.size();
+            
+            if(statement.kind == StatementKind::Label) {
+                symbolTable.addLabel(statement.name, statement.offset);
+                continue;
+            }
+          
             std::uint8_t byte = 0;
             if (!encode_statement(statement, *loader.cpu(), byte, error))
             {

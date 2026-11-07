@@ -14,13 +14,20 @@ enum class DataType {
     Dword,
     Qword
 };
-
+enum class StatementKind {
+    Label,
+    Instruction,
+    Directive
+};
 struct Statement {
     std::string name;
     std::size_t line;
     DataType type = DataType::None;
     Expression expression;
     std::uint64_t value = 0;
+    std::string reg;
+    std::size_t offset = 0;
+    StatementKind kind = StatementKind::Instruction;
 };
 
 bool parse_statement(const std::vector<Token>& tokens, Statement& statement, std::string& error);

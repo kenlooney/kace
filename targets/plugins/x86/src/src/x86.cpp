@@ -15,7 +15,62 @@
  */
 #include <x86/x86.hpp>
 
-bool X86::encode_no_operand(const std::string& name, std::uint8_t& byte) const {
-    if (name == "nop") { byte = 0x90; return true; }
+// Encoding
+bool X86::encode_no_operand(const std::string &name, std::uint8_t &byte) const
+{
+    if (name == "nop")
+    {
+        byte = 0x90;
+        return true;
+    }
+    return false;
+}
+bool X86::encode_immediate(
+    const std::string &name,
+    const std::string &reg,
+    std::uint64_t value,
+    std::vector<std::vector<std::uint8_t>> &bytes,
+    std::string &error) const
+{
+    if (name != "mov" || reg != "al")
+    {
+        error = "Expected mov al, immediate";
+        return false;
+    }
+    if (value > 255)
+    {
+        error = "Immediate does not fit in AL";
+        return false;
+    }
+    bytes.push_back({0xB0});
+    bytes.push_back({static_cast<std::uint8_t>(value)});
+    return true;
+}
+
+// Decoding
+bool X86::decode(const std::vector<std::uint8_t> &bytes, std::size_t &offset,
+                 std::string &text) const
+{
+    // Check if there are enough bytes to decode
+    if (offset >= bytes.size())
+        return false;
+
+    // Decode NOP instruction
+    if (bytes[offset] == 0x90)
+    {
+        ++offset;
+        text = "nop";
+        return true;
+    }
+
+    // Decode MOV AL, immediate instruction
+    if (bytes[offset] == 0xB0 && offset + 1 < bytes.size())
+    {
+        text = "mov al, " + std::to_string(bytes[offset + 1]);
+        offset += 2;
+        return true;
+    }
+
+    // Unknown instruction
     return false;
 }

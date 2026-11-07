@@ -36,20 +36,42 @@ assembly concepts.
   define byte ((8 take 3) mul 2)
   ```
 
-- Byte-range semantic validation
-- Extensible keyword, operator, and alias tables
+- Byte-range semantic validation and raw binary output for byte definitions
+- A CPU plugin interface and an x86 plugin that emits `nop`
+- Parsing of `mov`, `move`, and `copy` immediate expressions and registers
+- Label recognition and offset recording, plus a symbol table with save/load helpers
+- Extensible keyword and operator alias tables
 - CTest-based automated tests
 
-## Example Output
+## Using KASM
 
-The current multiline parser evaluates the example above as:
+For example, save this as `example.asm`:
 
-```text
-line 1: Checked byte: 5
-line 2: Checked byte: 48
-line 3: Checked byte: 10
-parsed 3 statements
+```asm
+start:
+nop
+define byte 3 sum 2
+define_byte 7
+nop
 ```
+
+From a Windows Debug build, assemble it with:
+
+```powershell
+.\bin\Debug\kasm.exe --cpu=x86 -i example.asm -o example.bin
+```
+
+The output is the raw byte sequence `90 05 07 90`. The CPU defaults to
+`x86`; use `-c` or `--cpu` to select a plugin. Run `kasm --help` for CLI
+options. The plugin and shared libraries must be next to the executable.
+
+Labels on their own lines are recorded while output is generated. Label
+references and resolution are not yet implemented, and the CLI does not
+yet save the symbol table. The parser accepts immediate `mov` expressions,
+and the x86 plugin can encode `mov al` with an 8-bit immediate, but that
+encoding is not yet connected to the CLI's output path. Similarly, the x86
+plugin can decode `nop` and `mov al, immediate`; the CLI's `--disassemble`
+option is currently a placeholder and does not decode the input.
 
 ## Building
 
@@ -65,7 +87,9 @@ cmake -S . -B build
 cmake --build build --config Debug
 ```
 
-The executables and shared libraries are written to `bin/`.
+The executables and shared libraries are written to `bin/` (for a Visual
+Studio Debug build, `bin/Debug/`). Existing presets are listed in
+`CMakePresets.json`.
 
 ## Running Tests
 
@@ -75,8 +99,10 @@ Run the complete test suite with:
 ctest --test-dir build --output-on-failure -C Debug
 ```
 
-The test suite currently covers source loading, diagnostics, token display,
-integer parsing, expression parsing, and multiline statement parsing.
+The test suite covers source loading, diagnostics, lexing, expression and
+statement parsing, CLI output, CPU plugins, x86 encoding and decoding, and
+symbol table persistence. Use CTest's `-V` option to show output from passing
+tests, or select a test in CMake Tools' Test Explorer.
 
 ## Repository Layout
 
@@ -85,6 +111,7 @@ targets/
   kace/       Generic KACE library
   kasmcore/   KASM lexer and parser integration
   kasm/       KASM command-line executable
+  plugins/x86/  x86 CPU plugin
 tests/        Automated tests
 examples/     Example assembly source files
 ```
@@ -93,10 +120,10 @@ examples/     Example assembly source files
 
 Planned development includes:
 
-- Word, double-word, and quad-word data definitions
-- Binary output generation
-- Instruction and operand parsing
-- Register and addressing-mode support
+- Output for word, double-word, and quad-word data definitions
+- Label references and resolution
+- Connecting immediate encoding and disassembly to the CLI
+- More instructions, registers, and addressing modes
 - A complete KASM command-line workflow
 - Stable releases and packaged distributions
 

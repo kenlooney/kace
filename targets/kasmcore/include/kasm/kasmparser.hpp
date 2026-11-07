@@ -18,6 +18,8 @@
 #include <kace/parser.hpp>
 #include <sstream>
 #include <vector>
+// For testing purposes
+#include <iostream>
 
 class KasmParser : public Parser {
 public:
@@ -33,7 +35,11 @@ public:
         // Add aliases for parentheses
         ops_table.addto_alias("(", "{");
         ops_table.addto_alias(")", "}");
+
+        // KeywordTable already registers the mov aliases.
     }
+
+   
 
     bool parse(
         const Source& source,
@@ -44,6 +50,7 @@ public:
         std::istringstream input(source.text);
         std::string line;
         std::size_t line_number = 0;
+        
 
         while (std::getline(input, line)) {
             ++line_number;
@@ -56,13 +63,24 @@ public:
 
             Statement statement;
             statement.line = line_number;
+            statement.name = tokens[0].text;
+
+            // Check for labels before identifiers
+            if(tokens[0].kind == "label") {
+               
+                statement.kind = StatementKind::Label;
+                statements.push_back(statement);
+                continue;
+            }
+            
             if (tokens[0].kind != "identifier") {
                 error = source.name + ":" +
                     std::to_string(line_number) +
                     ": Expected a statement name";
                 return false;
             }
-            statement.name = tokens[0].text;
+          
+           
             for (const Alias& keyword : keywords_table.aliases()) {
                 if (statement.name == keyword.symbol) {
                     break;
@@ -79,7 +97,32 @@ public:
             }
 
             std::size_t operand_start = 1;
+            std::size_t operand_end = tokens.size();
+            
+            
+            if (statement.name == "mov") {
+                // move/copy/mov <expression> into <register>
+                if (tokens.size() < 4) {
+                    error = source.name + ":" +
+                        std::to_string(line_number) +
+                        ": Expected an expression and a target register";
+                    return false;
+                }
+                if (tokens[1].kind == "identifier" && tokens[2].text == ",") {
+                    statement.reg = tokens[1].text;
+                    operand_start = 3;
+                } else if (tokens[tokens.size() - 2].text == "into" &&
+                           tokens.back().kind == "identifier") {
+                    statement.reg = tokens.back().text;
+                    operand_end -= 2;
+                } else {
+                    error = source.name + ":" + std::to_string(line_number) +
+                        ": Expected an expression and a target register";
+                    return false;
+                }
+            }
             if (statement.name == "define") {
+                statement.kind = StatementKind::Directive;
                 if (tokens.size() < 3 || tokens[1].kind != "identifier") {
                     error = source.name + ":" +
                         std::to_string(line_number) +
@@ -109,7 +152,7 @@ public:
 
             std::vector<Token> operands(
                 tokens.begin() + operand_start,
-                tokens.end()
+                tokens.begin() + operand_end
             );
             if (operands.empty() && statement.type == DataType::None) {
                 statements.push_back(statement);

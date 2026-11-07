@@ -77,6 +77,12 @@ std::vector<Token> KasmLexer::tokenize(const std::string& input) {
            while(cursor < input.size() && (is_letter(input[cursor]) || is_digit(input[cursor]) || input[cursor] == '_')) {
                ++cursor;
            }
+           // Check if it is a label (ends with ':')
+           if(cursor < input.size() && input[cursor] == ':') {
+               ++cursor;
+               addToken(Token{"label", input.substr(begin, cursor - begin), Span{begin, cursor}});
+               continue;
+           }
            addToken(Token{"identifier", input.substr(begin, cursor - begin), Span{begin, cursor}});
            continue;
        }

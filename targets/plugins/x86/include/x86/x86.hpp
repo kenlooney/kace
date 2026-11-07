@@ -19,5 +19,18 @@
 class X86 : public Cpu {
     public:
     virtual ~X86() = default;
+    // Encoding
     virtual bool encode_no_operand(const std::string& name, std::uint8_t& byte) const override;
+    virtual bool encode_immediate(
+        const std::string& name, 
+        const std::string& reg, 
+        std::uint64_t value,
+        std::vector<std::vector<std::uint8_t>>& bytes,
+        std::string& error
+    ) const override;
+
+    // Decoding
+    bool decode(const std::vector<std::uint8_t>& bytes, std::size_t& offset,
+                std::string& text) const override;
+    
 };

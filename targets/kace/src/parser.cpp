@@ -351,7 +351,7 @@ bool Parser::parse(Source &source, std::string &error)
 {
     std::vector<Statement> statements;
     std::istringstream input(source.text);
-
+    std::uint64_t offset = 0;
     std::string line_text;
     std::size_t line_number = 1;
     while (std::getline(input, line_text))
@@ -379,7 +379,9 @@ bool Parser::parse(Source &source, std::string &error)
             return false;
         }
 
+        statement.offset = offset;
         statements.push_back(statement);
+        offset += value;
         ++line_number;
     }
 

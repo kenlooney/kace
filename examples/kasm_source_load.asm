@@ -3,9 +3,8 @@ start:
     mov ax, 10
     mov bx, 0b1010
     mov cx, 0xA
-    mov dx, 0o12
-    mov ax, 1010b
-    mov bx, 0Ah
+    copy 0xA into al 
+
 
     nop ; This is a traditional single-line assemblycomment
 halt_cpu:
