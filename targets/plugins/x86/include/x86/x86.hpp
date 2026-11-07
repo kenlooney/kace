@@ -47,6 +47,8 @@ class X86 : public Cpu {
     ) const override;
     bool decode_no_operand(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
     bool decode_short_jump(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
+    bool short_jump_displacement(const std::vector<std::uint8_t>& bytes, std::size_t offset,
+                                 std::int64_t& displacement) const override;
     bool decode_immediate(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
    
    

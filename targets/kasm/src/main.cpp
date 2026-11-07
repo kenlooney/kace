@@ -12,6 +12,8 @@
 #include <filesystem>
 #include <iomanip>
 #include <iterator>
+#include <map>
+#include <algorithm>
 #include <kace/source.hpp>
 #include <string_view>
 #include "kace/symbols.hpp"
@@ -254,7 +256,29 @@ int main(int argc, char *argv[])
         std::string error;
         if (!loadCpu(commandLine, argv[0], loader, error)) return 1;
 
-        std::ostringstream decoded;
+        auto symbolsPath = inputPath;
+        symbolsPath.replace_extension(".sym");
+        SymbolTable symbols;
+        std::error_code symbolsError;
+        const bool hasSymbols = std::filesystem::exists(symbolsPath, symbolsError);
+        if (symbolsError || (hasSymbols && !symbols.load_from_file(symbolsPath.string())))
+        {
+            std::cerr << "kasm: could not load symbol file: " << symbolsPath.string() << "\n";
+            return 1;
+        }
+        if (hasSymbols && std::filesystem::equivalent(symbolsPath, outputPath, pathError))
+        {
+            std::cerr << "kasm: disassembly output must differ from the symbol file\n";
+            return 1;
+        }
+        std::map<std::size_t, std::vector<std::string>> labels;
+        for (const Symbol& symbol : symbols.getSymbolsByKind(SymbolKind::Label))
+            labels[symbol.offset].push_back(symbol.name);
+        for (auto& entry : labels)
+            std::sort(entry.second.begin(), entry.second.end());
+
+        struct DecodedInstruction { std::size_t offset; std::size_t end; std::string text; };
+        std::vector<DecodedInstruction> instructions;
         std::size_t offset = 0;
         while (offset < bytes.size())
         {
@@ -265,8 +289,45 @@ int main(int argc, char *argv[])
                 std::cerr << "kasm: could not decode instruction at byte offset " << start << "\n";
                 return 1;
             }
+            instructions.push_back({start, offset, text});
+        }
+        for (const auto& label : labels)
+        {
+            if (label.first != bytes.size() && std::none_of(instructions.begin(), instructions.end(),
+                    [&](const DecodedInstruction& instruction) { return instruction.offset == label.first; }))
+            {
+                std::cerr << "kasm: symbol offset is not an instruction boundary: " << label.first << "\n";
+                return 1;
+            }
+        }
+        std::ostringstream decoded;
+        for (const auto& instruction : instructions)
+        {
+            const auto definitions = labels.find(instruction.offset);
+            if (definitions != labels.end())
+                for (const auto& name : definitions->second) decoded << name << ":\n";
+            std::int64_t displacement = 0;
+            std::string text = instruction.text;
+            if (loader.cpu()->short_jump_displacement(bytes, instruction.offset, displacement))
+            {
+                std::size_t target = instruction.end;
+                bool valid = true;
+                if (displacement < 0)
+                {
+                    const auto magnitude = static_cast<std::uint64_t>(-(displacement + 1)) + 1;
+                    if (magnitude > target) valid = false;
+                    else target -= static_cast<std::size_t>(magnitude);
+                }
+                else if (static_cast<std::uint64_t>(displacement) > bytes.size() - target) valid = false;
+                else target += static_cast<std::size_t>(displacement);
+                const auto found = valid ? labels.find(target) : labels.end();
+                if (found != labels.end()) text = "jmp short " + found->second.front();
+            }
             decoded << text << '\n';
         }
+        const auto endLabels = labels.find(bytes.size());
+        if (endLabels != labels.end())
+            for (const auto& name : endLabels->second) decoded << name << ":\n";
         std::ofstream output(outputPath, std::ios::binary);
         if (output) output << decoded.str();
         output.close();
@@ -317,7 +378,11 @@ int main(int argc, char *argv[])
 
             if (statement.kind == StatementKind::Label)
             {
-                symbolTable.addLabel(statement.name, statement.offset);
+                if (!symbolTable.addLabel(statement.name, statement.offset))
+                {
+                    std::cerr << commandLine.input << ":" << statement.line << ": Duplicate label: " << statement.name << "\n";
+                    return 1;
+                }
                 continue;
             }
             if (statement.kind == StatementKind::JumpShort)
@@ -371,10 +436,25 @@ int main(int argc, char *argv[])
             bytes[fixup.offset] = encoded[0];
             bytes[fixup.offset + 1] = encoded[1];
         }
+        const std::filesystem::path binaryPath{std::string(commandLine.output)};
+        auto symbolsPath = binaryPath;
+        symbolsPath.replace_extension(".sym");
+        const auto sourcePath = std::filesystem::absolute(std::filesystem::path(std::string(commandLine.input))).lexically_normal();
+        if (std::filesystem::absolute(binaryPath).lexically_normal() == std::filesystem::absolute(symbolsPath).lexically_normal() ||
+            std::filesystem::absolute(symbolsPath).lexically_normal() == sourcePath)
+        {
+            std::cerr << "kasm: symbol file must differ from the binary and input file\n";
+            return 1;
+        }
         std::ofstream outFile(std::string(commandLine.output), std::ios::binary);
         if (!outFile)
         {
             std::cerr << "kasm: could not open output file: " << commandLine.output << "\n";
+            return 1;
+        }
+        if (!symbolTable.save_to_file(symbolsPath.string()))
+        {
+            std::cerr << "kasm: could not write symbol file: " << symbolsPath.string() << "\n";
             return 1;
         }
         outFile.write(reinterpret_cast<const char *>(bytes.data()), bytes.size());

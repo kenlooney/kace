@@ -83,20 +83,24 @@ bytes per short jump, then resolves each target after recording labels. The
 x86 plugin emits `EB` and a signed 8-bit displacement relative to the end of
 the jump. Unknown labels and displacements outside -128 through 127 are
 reported before the output file is opened. Near and far jumps are not yet
-supported. Duplicate label definitions are not currently reported by the CLI.
-The CLI does not yet save the symbol table.
+supported. Duplicate label definitions are reported as errors.
+Each successful assembly writes a `.sym` symbol file next to the output binary,
+using the same filename with its extension replaced (for example,
+`example.bin` and `example.sym`). Keep these files together.
 
 For the jump example above, KASM produces `EB 01 90 EB FB`. Disassembling
-that binary produces the following text:
+that binary with its matching symbol file produces the following text:
 
 ```text
-jmp 1
+start:
+jmp short done
 nop
-jmp -5
+done:
+jmp short start
 ```
 
-The jump values are signed relative displacements; the original label names
-are not stored in the raw binary. Disassembly uses canonical instruction names
+The symbol file supplies label names and offsets; the raw binary does not store
+them. Disassembly uses canonical instruction names
 such as `jmp`, even when the source used an alias such as `jump` or `goto`.
 The original spelling is not preserved in the binary.
 
@@ -115,10 +119,12 @@ an existing binary into a text file, run:
 .\bin\Debug\kasm.exe --disassemble -i example.bin
 ```
 
-This writes `example.dism` next to the input. To choose a different name or
-directory, pass `-o`; its extension is replaced with `.dism`. Decoded jumps
-show their relative displacement, not the original label name, and are not yet
-directly reassemblable. Unknown or incomplete instructions stop decoding with
+This writes `example.dism` next to the input and automatically reads
+`example.sym` if present. To choose a different output name or directory,
+pass `-o`; its extension is replaced with `.dism`. Without a matching symbol
+file, jumps show numeric relative displacements and are not directly
+reassemblable. Keep the symbol file paired with its binary: KASM does not
+verify that they match. Unknown or incomplete instructions stop decoding with
 an error and do not replace an existing output file.
 
 ## Building
@@ -170,7 +176,7 @@ examples/     Example assembly source files
 Planned development includes:
 
 - Output for word, double-word, and quad-word data definitions
-- Near and far jumps, broader label resolution, and duplicate-label diagnostics
+- Near and far jumps and broader label resolution
 - CPU mode selection and mode-aware encoding
 - Connecting immediate encoding to the CLI and expanding disassembly
 - More instructions, registers, and addressing modes

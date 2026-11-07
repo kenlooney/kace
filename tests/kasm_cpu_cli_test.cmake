@@ -30,4 +30,4 @@ execute_process(COMMAND "${KASM}" --cpu=unknown -i "${input}" -o "${output}"
 if(result EQUAL 0 OR NOT error MATCHES "could not load CPU plugin 'unknown'")
   message(FATAL_ERROR "Expected a missing CPU plugin error: ${error}")
 endif()
-file(REMOVE "${input}" "${output}")
+file(REMOVE "${input}" "${output}" "${TEST_DIR}/cpu_cli_output.sym")
