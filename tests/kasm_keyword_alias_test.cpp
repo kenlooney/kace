@@ -27,5 +27,23 @@ int main() {
             return 1;
         }
     }
+    source.text = "jmp short done\njump short done\ngoto short done\n";
+    if (!parser.parse(source, statements, error) || statements.size() != 3 ||
+        statements[0].kind != StatementKind::JumpShort ||
+        statements[1].kind != StatementKind::JumpShort ||
+        statements[2].kind != StatementKind::JumpShort) {
+        std::cerr << "Jump kinds or aliases did not parse correctly: " << error << '\n';
+        return 1;
+    }
+    for (const auto& statement : statements) {
+        if (statement.name != "jmp" || statement.target != "done") return 1;
+    }
+    for (const std::string& invalid : {"jmp short", "jmp short 42", "jmp short done extra", "jmp wide done", "jmp near done", "jmp far done"}) {
+        source.text = invalid;
+        if (parser.parse(source, statements, error)) {
+            std::cerr << "Invalid jump accepted: " << invalid << '\n';
+            return 1;
+        }
+    }
     return 0;
 }

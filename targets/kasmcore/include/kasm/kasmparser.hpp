@@ -21,9 +21,11 @@
 // For testing purposes
 #include <iostream>
 
-class KasmParser : public Parser {
+class KasmParser : public Parser
+{
 public:
-    explicit KasmParser(const std::vector<Token>& input) : Parser(input) {
+    explicit KasmParser(const std::vector<Token> &input) : Parser(input)
+    {
         ops_table.addto_alias("+", "add");
         ops_table.addto_alias("+", "sum");
         ops_table.addto_alias("-", "sub");
@@ -36,125 +38,180 @@ public:
         ops_table.addto_alias("(", "{");
         ops_table.addto_alias(")", "}");
 
-        // KeywordTable already registers the mov aliases.
+        // "jmp" already has an alias in the KeywordTable, but we can add more if needed.
+        keywords_table.add_alias("jmp", {"jump", "goto"});
     }
 
-   
-
     bool parse(
-        const Source& source,
-        std::vector<Statement>& statements,
-        std::string& error
-    ) {
+        const Source &source,
+        std::vector<Statement> &statements,
+        std::string &error)
+    {
         statements.clear();
         std::istringstream input(source.text);
         std::string line;
         std::size_t line_number = 0;
-        
 
-        while (std::getline(input, line)) {
+        while (std::getline(input, line))
+        {
             ++line_number;
 
             KasmLexer lexer;
-            const std::vector<Token>& tokens = lexer.tokenize(line);
-            if (tokens.empty()) {
+            const std::vector<Token> &tokens = lexer.tokenize(line);
+            if (tokens.empty())
+            {
                 continue;
             }
 
             Statement statement;
             statement.line = line_number;
-            statement.name = tokens[0].text;
 
             // Check for labels before identifiers
-            if(tokens[0].kind == "label") {
-               
+            if (tokens[0].kind == "label")
+            {
+
                 statement.kind = StatementKind::Label;
+                statement.name = tokens[0].text.substr(0, tokens[0].text.size() - 1);
                 statements.push_back(statement);
                 continue;
             }
-            
-            if (tokens[0].kind != "identifier") {
+
+            if (tokens[0].kind != "identifier")
+            {
                 error = source.name + ":" +
-                    std::to_string(line_number) +
-                    ": Expected a statement name";
+                        std::to_string(line_number) +
+                        ": Expected a statement name";
                 return false;
             }
-          
-           
-            for (const Alias& keyword : keywords_table.aliases()) {
-                if (statement.name == keyword.symbol) {
+
+            statement.name = tokens[0].text;
+
+            for (const Alias &keyword : keywords_table.aliases())
+            {
+                if (statement.name == keyword.symbol)
+                {
                     break;
                 }
-                for (const std::string& alias : keyword.values) {
-                    if (statement.name == alias) {
+                for (const std::string &alias : keyword.values)
+                {
+                    if (statement.name == alias)
+                    {
                         statement.name = keyword.symbol;
                         break;
                     }
                 }
-                if (statement.name == keyword.symbol) {
+                if (statement.name == keyword.symbol)
+                {
                     break;
                 }
             }
 
             std::size_t operand_start = 1;
             std::size_t operand_end = tokens.size();
-            
-            
-            if (statement.name == "mov") {
+
+            if (statement.name == "mov")
+            {
                 // move/copy/mov <expression> into <register>
-                if (tokens.size() < 4) {
+                if (tokens.size() < 4)
+                {
                     error = source.name + ":" +
-                        std::to_string(line_number) +
-                        ": Expected an expression and a target register";
+                            std::to_string(line_number) +
+                            ": Expected an expression and a target register";
                     return false;
                 }
-                if (tokens[1].kind == "identifier" && tokens[2].text == ",") {
+                if (tokens[1].kind == "identifier" && tokens[2].text == ",")
+                {
                     statement.reg = tokens[1].text;
                     operand_start = 3;
-                } else if (tokens[tokens.size() - 2].text == "into" &&
-                           tokens.back().kind == "identifier") {
+                }
+                else if (tokens[tokens.size() - 2].text == "into" &&
+                         tokens.back().kind == "identifier")
+                {
                     statement.reg = tokens.back().text;
                     operand_end -= 2;
-                } else {
+                }
+                else
+                {
                     error = source.name + ":" + std::to_string(line_number) +
-                        ": Expected an expression and a target register";
+                            ": Expected an expression and a target register";
                     return false;
                 }
             }
-            if (statement.name == "define") {
-                statement.kind = StatementKind::Directive;
-                if (tokens.size() < 3 || tokens[1].kind != "identifier") {
+            if (statement.name == "jmp")
+            {
+                if (tokens.size() != 3 || tokens[2].kind != "identifier")
+                {
                     error = source.name + ":" +
-                        std::to_string(line_number) +
-                        ": Expected a data type and expression";
+                            std::to_string(line_number) +
+                            ": Expected a jump type and target label";
+                    return false;
+                }
+                const std::string &type = tokens[1].text;
+                if (type == "short")
+                    statement.kind = StatementKind::JumpShort;
+                // else if (type == "near")
+                //     statement.kind = StatementKind::JumpNear;
+                // else if (type == "far")
+                //     statement.kind = StatementKind::JumpFar;
+                else
+                {
+                    error = source.name + ":" +
+                            std::to_string(line_number) +
+                            ": Expected a jump type short (near, far types are not supported)";
+                    return false;
+                }
+                statement.target = tokens[2].text;
+                statements.push_back(statement);
+                continue;
+            }
+
+            if (statement.name == "define")
+            {
+                statement.kind = StatementKind::Directive;
+                if (tokens.size() < 3 || tokens[1].kind != "identifier")
+                {
+                    error = source.name + ":" +
+                            std::to_string(line_number) +
+                            ": Expected a data type and expression";
                     return false;
                 }
 
-                const std::string& type = tokens[1].text;
-                if (type == "byte") {
+                const std::string &type = tokens[1].text;
+                if (type == "byte")
+                {
                     statement.type = DataType::Byte;
-                } else if (type == "word") {
+                }
+                else if (type == "word")
+                {
                     statement.type = DataType::Word;
-                } else if (type == "dword") {
+                }
+                else if (type == "dword")
+                {
                     statement.type = DataType::Dword;
-                } else if (type == "qword") {
+                }
+                else if (type == "qword")
+                {
                     statement.type = DataType::Qword;
-                } else {
+                }
+                else
+                {
                     error = source.name + ":" +
-                        std::to_string(line_number) +
-                        ": Unknown data type: " + type;
+                            std::to_string(line_number) +
+                            ": Unknown data type: " + type;
                     return false;
                 }
                 operand_start = 2;
-            } else if (statement.name == "db") {
+            }
+            else if (statement.name == "db")
+            {
                 statement.type = DataType::Byte;
             }
 
             std::vector<Token> operands(
                 tokens.begin() + operand_start,
-                tokens.begin() + operand_end
-            );
-            if (operands.empty() && statement.type == DataType::None) {
+                tokens.begin() + operand_end);
+            if (operands.empty() && statement.type == DataType::None)
+            {
                 statements.push_back(statement);
                 continue;
             }
@@ -162,9 +219,10 @@ public:
             if (!line_parser.parse_expression(
                     statement.expression,
                     statement.value,
-                    error)) {
+                    error))
+            {
                 error = source.name + ":" +
-                    std::to_string(line_number) + ": " + error;
+                        std::to_string(line_number) + ": " + error;
                 return false;
             }
 
