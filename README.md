@@ -86,6 +86,20 @@ reported before the output file is opened. Near and far jumps are not yet
 supported. Duplicate label definitions are not currently reported by the CLI.
 The CLI does not yet save the symbol table.
 
+For the jump example above, KASM produces `EB 01 90 EB FB`. Disassembling
+that binary produces the following text:
+
+```text
+jmp 1
+nop
+jmp -5
+```
+
+The jump values are signed relative displacements; the original label names
+are not stored in the raw binary. Disassembly uses canonical instruction names
+such as `jmp`, even when the source used an alias such as `jump` or `goto`.
+The original spelling is not preserved in the binary.
+
 The CPU interface provides default implementations that report unsupported
 operations, so plugins can override the encoders and decoder they support.
 The x86 plugin also stores a 16-, 32-, or 64-bit mode, defaulting to 16-bit;
@@ -135,8 +149,9 @@ ctest --test-dir build --output-on-failure -C Debug
 
 The test suite covers source loading, diagnostics, lexing, expression and
 statement parsing, CLI output, CPU plugins, x86 encoding and decoding, and
-symbol table persistence. Use CTest's `-V` option to show output from passing
-tests, or select a test in CMake Tools' Test Explorer.
+symbol table persistence. The CLI tests also cover short-jump assembly and
+disassembly, including failure cases. Use CTest's `-V` option to show output
+from passing tests, or select a test in CMake Tools' Test Explorer.
 
 ## Repository Layout
 
