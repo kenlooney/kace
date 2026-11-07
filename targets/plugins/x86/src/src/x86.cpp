@@ -115,17 +115,21 @@ bool X86::decode_immediate(const std::vector<std::uint8_t>& bytes, std::size_t& 
 }
 bool X86::decode_short_jump(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const
 {
-    if (offset + 1 >= bytes.size())
+    std::int64_t displacement = 0;
+    if (!short_jump_displacement(bytes, offset, displacement))
         return false;
+    offset += 2;
+    text = "jmp " + std::to_string(displacement);
+    return true;
+}
 
-    if (bytes[offset] == 0xEB)
-    {
-        std::int8_t displacement = static_cast<std::int8_t>(bytes[offset + 1]);
-        offset += 2;
-        text = "jmp " + std::to_string(displacement);
-        return true;
-    }
-
-    return false;
+bool X86::short_jump_displacement(const std::vector<std::uint8_t>& bytes, std::size_t offset,
+                                  std::int64_t& displacement) const
+{
+    if (offset >= bytes.size() || bytes.size() - offset < 2 || bytes[offset] != 0xEB)
+        return false;
+    const auto value = bytes[offset + 1];
+    displacement = value < 128 ? value : static_cast<int>(value) - 256;
+    return true;
 }
 

@@ -131,20 +131,27 @@ public:
         for (const auto& pair : symbols) {
             file << pair.first << " " << static_cast<int>(pair.second.kind) << " " << pair.second.offset << "\n";
         }
-        return true;
+        file.close();
+        return static_cast<bool>(file);
     }
     bool load_from_file(const std::string& filename) {
         std::ifstream file(filename);
         if (!file.is_open()) {
             return false;
         }
-        symbols.clear();
+        SymbolTable loaded;
         std::string name;
         int kindInt;
         std::size_t offset;
-        while (file >> name >> kindInt >> offset) {
-            addSymbol({name, static_cast<SymbolKind>(kindInt), offset});
+        while (file >> name) {
+            if (!(file >> kindInt >> offset) || kindInt < static_cast<int>(SymbolKind::Label) ||
+                kindInt > static_cast<int>(SymbolKind::Directive) || loaded.hasSymbol(name)) {
+                return false;
+            }
+            loaded.addSymbol({name, static_cast<SymbolKind>(kindInt), offset});
         }
+        if (!file.eof()) return false;
+        symbols.swap(loaded.symbols);
         return true;
     }
 

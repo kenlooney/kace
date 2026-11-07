@@ -112,7 +112,8 @@
             are still in development.
           </p>
           <p>The KASM CLI can also disassemble supported x86 instructions into a <code>.dism</code> file.
-            Decoded jumps show their relative displacement; raw binaries don’t preserve the original label names.
+            Assembly saves labels in a matching <code>.sym</code> file, which the disassembler can use to restore
+            jump targets. Without that file, jumps show their relative displacement.
             Disassembly uses standard instruction names like <code>jmp</code>, even when the source used
             an alias such as <code>jump</code> or <code>goto</code>.
           </p><a class="inline-link" href="#download">EXPLORE RELEASES <span>↗</span></a>
@@ -124,7 +125,7 @@
           <pre><span class="muted">; forward and backward jumps</span>&#10;&#10;<span class="code-label">start:</span>&#10;    <span class="code-op">jmp short</span> done&#10;    <span class="code-op">nop</span>&#10;<span class="code-label">done:</span>&#10;    <span class="code-op">jmp short</span> start</pre>
           <div class="code-caption"><span>THE IDEA</span>
             <p>Output bytes: <code>EB 01 90 EB FB</code></p>
-            <p>Disassembled: <code>jmp 1</code> · <code>nop</code> · <code>jmp -5</code></p>
+            <p>With the matching symbols, disassembly restores <code>done</code> and <code>start</code>.</p>
           </div>
         </div>
       </div>
