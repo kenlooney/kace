@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Meet KACE, Ken's Assembly and Compiler Environment, and KASM, its readable assembler.">
+  <meta name="theme-color" content="#101d1b">
+  <title>KACE — A little closer to the machine</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header" id="top">
+    <a class="brand" href="#top" aria-label="KACE home"><span class="brand-mark">K<span>.</span></span><span>KACE<small>ASSEMBLY &amp; COMPILER ENVIRONMENT</small></span></a>
+    <nav aria-label="Main navigation"><a href="#about">The project</a><a href="#kasm">Meet KASM</a><a href="#plugins">Plugins</a><a href="#creator">The creator</a></nav>
+    <a class="header-link" href="#download">Get KACE <span aria-hidden="true">↗</span></a>
+  </header>
+  <main>
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot"></span> AN INDEPENDENT PROJECT IN DEVELOPMENT</p>
+        <h1>A little closer<br>to the <em>machine.</em></h1>
+        <p class="hero-intro">A hands-on environment for exploring how source code becomes something a machine can understand.</p>
+        <div class="hero-actions"><a class="button button-light" href="#about">Explore the project <span>↘</span></a><a class="text-link" href="#download">Get a release <span>↗</span></a></div>
+      </div>
+      <div class="hero-art" aria-label="An example showing KASM source and its output bytes">
+        <div class="art-top"><span>ANATOMY OF AN INSTRUCTION</span><span>01 / 03</span></div>
+        <div class="art-lines" aria-hidden="true"><span>01</span><span>02</span><span>03</span><span>04</span><span>05</span></div>
+        <div class="art-code"><span class="muted">; a small beginning</span><br><span class="code-label">start:</span><br>&nbsp;&nbsp;<span class="code-op">nop</span><br>&nbsp;&nbsp;<span class="code-op">define byte</span> <span class="code-value">42</span><br>&nbsp;&nbsp;<span class="code-op">nop</span></div>
+        <div class="art-output"><div><span>OUTPUT / HEX</span><strong>90 <i>2A</i> 90</strong></div><div class="art-arrow">↗</div></div>
+        <div class="art-foot"><span>FROM AN IDEA</span><span>TO BYTES</span></div>
+      </div>
+      <div class="hero-index"><span>SCROLL TO EXPLORE</span><span>↓</span></div>
+    </section>
+    <section class="intro section" id="about"><div class="wrap intro-grid"><div><p class="section-number">01 / THE PROJECT</p><h2>Made for the<br><em>curious.</em></h2></div><div class="intro-copy"><p class="lead">KACE is a place to get closer to the process of building programming tools.</p><p>Short for <strong>Ken’s Assembly and Compiler Environment</strong>, KACE is a framework for creating assemblers and compiler front ends. It brings together the building blocks that turn text into structure, meaning, and eventually machine-readable output.</p><p>It’s an evolving project built around learning, experimentation, and the joy of understanding what happens beneath the surface.</p><a class="inline-link" href="#kasm">MEET THE ASSEMBLER <span>↗</span></a></div></div></section>
+    <section class="building section"><div class="wrap"><div class="section-heading"><div><p class="section-number">02 / UNDER THE HOOD</p><h2>Small pieces.<br><em>Big possibilities.</em></h2></div><p>A framework is only as interesting as what you can build with it. KACE provides the fundamentals to start putting the pieces together.</p></div><div class="feature-list"><article><span>01</span><h3>Read the source</h3><p>Load source files and turn their contents into meaningful tokens with a lexer.</p><span class="feature-icon">↗</span></article><article><span>02</span><h3>Understand the structure</h3><p>Parse statements and expressions, work with syntax trees, and evaluate values.</p><span class="feature-icon">⌘</span></article><article><span>03</span><h3>Find meaning</h3><p>Use aliases, symbols, and semantic checks to build a language with its own rules.</p><span class="feature-icon">∴</span></article><article><span>04</span><h3>Talk to the machine</h3><p>Explore CPU plugins and the process of encoding instructions as bytes.</p><span class="feature-icon">↳</span></article></div></div></section>
+    <section class="kasm section" id="kasm"><div class="wrap kasm-grid"><div class="kasm-copy"><p class="section-number">03 / THE ASSEMBLER</p><div class="kasm-badge">BUILT WITH KACE <span>↗</span></div><h2>Say hello<br>to <em>KASM.</em></h2><p class="lead">An assembler with a more readable side.</p><p>KASM is the first assembler being developed with KACE. It explores familiar assembly ideas alongside language choices that read a little more naturally—like using <code>sum</code> for addition or <code>copy</code> as an alias for <code>mov</code>.</p><p>It’s a work in progress, with x86 support, label handling, and decoding taking shape as the project grows.</p><a class="inline-link" href="#download">EXPLORE RELEASES <span>↗</span></a></div><div class="code-card"><div class="code-title"><div class="dots"><i></i><i></i><i></i></div><span>EXAMPLE.KASM</span><span>✳</span></div><pre><span class="muted">; expressions can read naturally</span>&#10;&#10;<span class="code-label">start:</span>&#10;    <span class="code-op">define byte</span> <span class="code-value">3</span> sum <span class="code-value">2</span>&#10;    <span class="code-op">define byte</span> <span class="code-value">12</span> mul <span class="code-value">4</span>&#10;    <span class="code-op">nop</span></pre><div class="code-caption"><span>THE IDEA</span><p>Readable expressions, real bytes.</p></div></div></div></section>
+    <section class="plugins section" id="plugins">
+      <div class="wrap">
+        <div class="section-heading"><div><p class="section-number">04 / CPU PLUGINS</p><h2>One framework.<br><em>Room to grow.</em></h2></div><p>CPU plugins give KASM a way to work with different architectures. Select a plugin by name when assembling, or build one for a new CPU.</p></div>
+        <div class="plugins-grid">
+          <div><p class="plugin-label">INCLUDED WITH KASM</p><ul class="plugin-list">
+            <!-- Add more CPU plugins as list items here. -->
+            <li><div><strong>x86</strong><span>DEFAULT CPU</span></div><p>Currently supports encoding <code>nop</code> through the assembler. The plugin also implements immediate <code>mov al</code> encoding and decoding for <code>nop</code> and <code>mov al</code>; those paths are still being connected to the CLI.</p></li>
+          </ul><p class="plugin-note">Select the included plugin with <code>--cpu=x86</code> or <code>-c x86</code>. x86 is selected by default.</p></div>
+          <div class="plugin-guide"><p class="plugin-label">ADDING A CPU PLUGIN</p><h3>Bring another architecture.</h3><ol><li>Implement the KACE <code>Cpu</code> interface for your target architecture.</li><li>Build it as a shared library and export the C factory functions <code>create_cpu</code> and <code>destroy_cpu</code>.</li><li>Place the library next to the KASM executable. Use the platform’s shared-library naming convention, such as <code>x86.dll</code> on Windows or <code>libx86.so</code> on Linux.</li><li>Select it with <code>--cpu=&lt;name&gt;</code> when producing output.</li></ol><p>The plugin interface and supported instructions are still evolving.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="creator section" id="creator"><div class="wrap creator-grid"><div class="portrait"><img src="profile.png" alt="Kenneth Looney, creator of KACE" loading="lazy"><span class="portrait-caption">THE PERSON BEHIND THE PROJECT</span></div><div class="creator-copy"><p class="section-number">05 / THE CREATOR</p><h2>Hi, I’m<br><em>Kenneth.</em></h2><p class="lead">The mind behind KACE and KASM.</p><p>I’m Kenneth Looney, the creator of KACE. This project is a space to explore assemblers, compilers, and the details that connect a programming language to the machine underneath.</p><p>It’s being built one idea, one instruction, and one experiment at a time.</p><div class="creator-signoff">KENNETH LOONEY <span>✳</span> CREATOR OF KACE</div></div></div></section>
+    <section class="download section" id="download"><div class="wrap download-inner"><div><p class="section-number">06 / GET STARTED</p><h2>Come build<br><em>something.</em></h2><p>KACE is actively evolving. Explore the available releases and follow along as the tools take shape.</p></div><div class="download-action"><span class="download-label">READY TO EXPLORE?</span><a class="button button-dark" href="https://github.com/kenlooney/kace/releases">Browse public releases <span>↗</span></a><small>Development releases may contain incomplete features.</small></div></div></section>
+  </main>
+  <footer><div class="wrap footer-inner"><a class="brand footer-brand" href="#top"><span class="brand-mark">K<span>.</span></span><span>KACE<small>ASSEMBLY &amp; COMPILER ENVIRONMENT</small></span></a><p>Made for the curious. Built by Kenneth Looney.</p><a href="#top">BACK TO TOP ↑</a></div></footer>
+</body>
+</html>
