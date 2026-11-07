@@ -37,9 +37,11 @@ assembly concepts.
   ```
 
 - Byte-range semantic validation and raw binary output for byte definitions
-- A CPU plugin interface and an x86 plugin that emits `nop`
+- A CPU plugin interface with default unsupported-operation implementations,
+  and an x86 plugin that encodes `nop` and short jumps
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
-- Label recognition and offset recording, plus a symbol table with save/load helpers
+- Label recognition, offset recording, and short-jump fixups, plus a symbol
+  table with save/load helpers
 - Extensible keyword and operator alias tables
 - CTest-based automated tests
 
@@ -65,9 +67,31 @@ The output is the raw byte sequence `90 05 07 90`. The CPU defaults to
 `x86`; use `-c` or `--cpu` to select a plugin. Run `kasm --help` for CLI
 options. The plugin and shared libraries must be next to the executable.
 
-Labels on their own lines are recorded while output is generated. Label
-references and resolution are not yet implemented, and the CLI does not
-yet save the symbol table. The parser accepts immediate `mov` expressions,
+Labels on their own lines are recorded while output is generated. A short
+jump can refer to a label before or after the jump:
+
+```asm
+start:
+jmp short done
+nop
+done:
+jmp short start
+```
+
+The jump aliases `jump` and `goto` are also recognized. KASM reserves two
+bytes per short jump, then resolves each target after recording labels. The
+x86 plugin emits `EB` and a signed 8-bit displacement relative to the end of
+the jump. Unknown labels and displacements outside -128 through 127 are
+reported before the output file is opened. Near and far jumps are not yet
+supported. Duplicate label definitions are not currently reported by the CLI.
+The CLI does not yet save the symbol table.
+
+The CPU interface provides default implementations that report unsupported
+operations, so plugins can override the encoders and decoder they support.
+The x86 plugin also stores a 16-, 32-, or 64-bit mode, defaulting to 16-bit;
+mode selection is not yet connected to the CLI.
+
+The parser accepts immediate `mov` expressions,
 and the x86 plugin can encode `mov al` with an 8-bit immediate, but that
 encoding is not yet connected to the CLI's output path. Similarly, the x86
 plugin can decode `nop` and `mov al, immediate`; the CLI's `--disassemble`
@@ -121,7 +145,8 @@ examples/     Example assembly source files
 Planned development includes:
 
 - Output for word, double-word, and quad-word data definitions
-- Label references and resolution
+- Near and far jumps, broader label resolution, and duplicate-label diagnostics
+- CPU mode selection and mode-aware encoding
 - Connecting immediate encoding and disassembly to the CLI
 - More instructions, registers, and addressing modes
 - A complete KASM command-line workflow

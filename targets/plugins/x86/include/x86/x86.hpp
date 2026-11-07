@@ -16,6 +16,11 @@
 #pragma once
 #include <kace/cpu.hpp>
 
+enum class X86Mode {
+    Bits16,
+    Bits32,
+    Bits64
+};
 class X86 : public Cpu {
     public:
     virtual ~X86() = default;
@@ -28,9 +33,22 @@ class X86 : public Cpu {
         std::vector<std::vector<std::uint8_t>>& bytes,
         std::string& error
     ) const override;
+    bool encode_short_jump(
+        std::int64_t displacement,
+        std::vector<std::uint8_t>& bytes,
+        std::string& error
+    ) const override;
 
     // Decoding
     bool decode(const std::vector<std::uint8_t>& bytes, std::size_t& offset,
                 std::string& text) const override;
+
+    // Other Public Functions
+    X86Mode getMode() const { return mode; }
+    void setMode(X86Mode newMode) { mode = newMode; }
+
+    // Fields
+    private:
+    X86Mode mode = X86Mode::Bits16; // Default to 16-bit mode
     
 };

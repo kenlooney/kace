@@ -36,6 +36,8 @@ public:
         add_alias("%", {"%"});
         add_alias("(", {"("});
         add_alias(")", {")"});
+
+         
     }
     bool is_operator(const std::string& symbol) const {
         return resolve_alias(symbol) != nullptr;
@@ -53,6 +55,7 @@ public:
         add_alias("mov", {"mov","move","copy"});
         add_alias("define", {"define"});
         add_alias("db", {"db","define_byte"});
+        add_alias("jmp", {"jmp"});
        
     }
     bool is_keyword(const std::string& symbol) const {

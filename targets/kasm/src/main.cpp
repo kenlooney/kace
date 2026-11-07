@@ -14,6 +14,7 @@
 #include <kace/source.hpp>
 #include <string_view>
 #include "kace/symbols.hpp"
+#include "kace/fixup.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -21,7 +22,7 @@
 #include <mach-o/dyld.h>
 #endif
 
-std::filesystem::path executableDirectory(const char* argv0)
+std::filesystem::path executableDirectory(const char *argv0)
 {
 #ifdef _WIN32
     std::wstring path(32768, L'\0');
@@ -40,7 +41,8 @@ std::filesystem::path executableDirectory(const char* argv0)
 #elif defined(__linux__)
     std::error_code error;
     const auto path = std::filesystem::read_symlink("/proc/self/exe", error);
-    if (!error) return path.parent_path();
+    if (!error)
+        return path.parent_path();
 #endif
     return std::filesystem::absolute(argv0).parent_path();
 }
@@ -90,14 +92,13 @@ CommandLine parseCommandLine(int argc, char *argv[])
         }
         else if (!optionsEnded && (arg == "-d" || arg == "--disassemble"))
         {
-            
+
             if (result.disassemble)
             {
                 result.error = "disassemble option specified more than once";
                 return result;
             }
             result.disassemble = true;
-            
         }
         else if (!optionsEnded && (arg == "-o" || arg == "--output" ||
                                    arg.substr(0, 9) == "--output="))
@@ -185,10 +186,9 @@ int main(int argc, char *argv[])
 {
     const auto commandLine = parseCommandLine(argc, argv);
     ClientMode mode = commandLine.disassemble ? ClientMode::Disassemble : ClientMode::Assemble;
-    
 
     if (!commandLine.error.empty())
-    {   
+    {
         std::cerr << "kasm: " << commandLine.error << "\n";
         return 1;
     }
@@ -200,7 +200,6 @@ int main(int argc, char *argv[])
         {
             showHelp = true;
         }
-
     }
     if (showHelp)
     {
@@ -247,7 +246,7 @@ int main(int argc, char *argv[])
             return 1;
         }
         const auto pluginPath = executableDirectory(argv[0]) /
-            (std::string(KACE_PLUGIN_PREFIX) + cpuName + KACE_PLUGIN_SUFFIX);
+                                (std::string(KACE_PLUGIN_PREFIX) + cpuName + KACE_PLUGIN_SUFFIX);
         Loader loader;
         if (!loader.open(pluginPath.string(), error))
         {
@@ -255,18 +254,26 @@ int main(int argc, char *argv[])
                       << pluginPath.string() << "): " << error << "\n";
             return 1;
         }
-        
+
         SymbolTable symbolTable;
         std::vector<std::uint8_t> bytes;
+        std::vector<JumpFixup> jumpFixups;
         for (Statement &statement : statements)
         {
             statement.offset = bytes.size();
-            
-            if(statement.kind == StatementKind::Label) {
+
+            if (statement.kind == StatementKind::Label)
+            {
                 symbolTable.addLabel(statement.name, statement.offset);
                 continue;
             }
-          
+            if (statement.kind == StatementKind::JumpShort)
+            {
+                jumpFixups.push_back({statement.target, statement.offset, statement.line});
+                bytes.push_back(0); // Placeholder for the jump instruction byte
+                bytes.push_back(0);
+                continue;
+            }
             std::uint8_t byte = 0;
             if (!encode_statement(statement, *loader.cpu(), byte, error))
             {
@@ -274,6 +281,42 @@ int main(int argc, char *argv[])
                 return 1;
             }
             bytes.push_back(byte);
+        }
+        // Pass 2 - Resolve jump fixups
+        for (const JumpFixup &fixup : jumpFixups)
+        {
+            const Symbol *label = symbolTable.getSymbol(fixup.target);
+            if (label == nullptr)
+            {
+                std::cerr << commandLine.input << ":" << fixup.line
+                          << ": Unknown label: " << fixup.target << "\n";
+                return 1;
+            }
+            std::size_t targetOffset = label->offset;
+            std::ptrdiff_t relativeOffset = static_cast<std::ptrdiff_t>(targetOffset) - static_cast<std::ptrdiff_t>(fixup.offset) - 2;
+            if (relativeOffset < -128 || relativeOffset > 127)
+            {
+                std::cerr << commandLine.input << ":" << fixup.line << ": Jump target out of range: " << fixup.target << "\n";
+                return 1;
+            }
+            bytes[fixup.offset + 1] = static_cast<std::uint8_t>(relativeOffset & 0xFF);
+            std::vector<std::uint8_t> encoded;
+            if (!loader.cpu()->encode_short_jump(relativeOffset, encoded, error))
+            {
+                std::cerr << commandLine.input << ":" << fixup.line
+                          << ": " << error << "\n";
+                return 1;
+            }
+
+            if (encoded.size() != 2)
+            {
+                std::cerr << commandLine.input << ":" << fixup.line
+                          << ": Expected a two-byte short jump\n";
+                return 1;
+            }
+
+            bytes[fixup.offset] = encoded[0];
+            bytes[fixup.offset + 1] = encoded[1];
         }
         std::ofstream outFile(std::string(commandLine.output), std::ios::binary);
         if (!outFile)

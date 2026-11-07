@@ -107,16 +107,20 @@
             a language that has more meaning and syntax then your typical assemblers. The language created for the assembler is ment to be very user and kid friendly with simple and intuitive constructs, making it easier to understand and use. My goal is to have it great as a learning tool that young people can pick up easily and enjoy.</p>
           <p>Choices that read a little more naturally—like using <code>sum</code> for addition or
             <code>copy</code> and <code>move</code> as an alias for <code>mov</code> and <code>define</code> to define byte widths. Instead of using <code>db</code>, which is ambiguous, the language opts for more descriptive constructs. Is <code>db</code> supposed to mean <i>drop byte</i> or <i>define byte</i>? it has no meaning! It’s about making the code more understandable and meaningful for the user.</p>
-          <p>It’s a work in progress, with x86 support, label handling, and decoding taking shape as the project grows.
+          <p>KASM can now resolve short jumps to labels before or after an instruction. Use <code>jmp short</code>,
+            <code>jump short</code>, or <code>goto short</code> to make the destination clear. Near and far jumps
+            are still in development.
+          </p>
+          <p>It’s a work in progress, with x86 support and decoding taking shape as the project grows.
           </p><a class="inline-link" href="#download">EXPLORE RELEASES <span>↗</span></a>
         </div>
         <div class="code-card">
           <div class="code-title">
             <div class="dots"><i></i><i></i><i></i></div><span>EXAMPLE.KASM</span><span>✳</span>
           </div>
-          <pre><span class="muted">; expressions can read naturally</span>&#10;&#10;<span class="code-label">start:</span>&#10;    <span class="code-op">define byte</span> <span class="code-value">3</span> sum <span class="code-value">2</span>&#10;    <span class="code-op">define byte</span> <span class="code-value">12</span> mul <span class="code-value">4</span>&#10;    <span class="code-op">nop</span></pre>
+          <pre><span class="muted">; forward and backward jumps</span>&#10;&#10;<span class="code-label">start:</span>&#10;    <span class="code-op">jmp short</span> done&#10;    <span class="code-op">nop</span>&#10;<span class="code-label">done:</span>&#10;    <span class="code-op">jmp short</span> start</pre>
           <div class="code-caption"><span>THE IDEA</span>
-            <p>Readable expressions, real bytes.</p>
+            <p>Output bytes: <code>EB 01 90 EB FB</code></p>
           </div>
         </div>
       </div>
@@ -138,7 +142,7 @@
               <!-- Add more CPU plugins as list items here. -->
               <li>
                 <div><strong>x86</strong><span>DEFAULT CPU</span></div>
-                <p>Currently supports encoding <code>nop</code> through the assembler. The plugin also implements
+                <p>Currently supports encoding <code>nop</code> and short jumps through the assembler. The plugin also implements
                   immediate <code>mov al</code> encoding and decoding for <code>nop</code> and <code>mov al</code>;
                   those paths are still being connected to the CLI.</p>
               </li>
@@ -150,7 +154,7 @@
             <p class="plugin-label">ADDING A CPU PLUGIN</p>
             <h3>Bring another architecture.</h3>
             <ol>
-              <li>Implement the KACE <code>Cpu</code> interface for your target architecture.</li>
+              <li>Override the KACE <code>Cpu</code> operations supported by your target architecture; the default implementations report unsupported operations.</li>
               <li>Build it as a shared library and export the C factory functions <code>create_cpu</code> and
                 <code>destroy_cpu</code>.</li>
               <li>Place the library next to the KASM executable. Use the platform’s shared-library naming convention,

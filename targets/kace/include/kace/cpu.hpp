@@ -21,16 +21,32 @@ class Cpu {
     public:
     virtual ~Cpu() = default;
     // Encoding
-    virtual bool encode_no_operand(const std::string& name, std::uint8_t& byte) const = 0;
+    virtual bool encode_no_operand(const std::string& name, std::uint8_t& byte) const {
+           return false;
+    };
     virtual bool encode_immediate(
         const std::string& name, 
         const std::string& reg, 
         std::uint64_t value,
         std::vector<std::vector<std::uint8_t>>& bytes,
         std::string& error
-    ) const = 0;
+    ) const {
+        error = "immediate encoding is not supported by this CPU";
+        return false;
+    }
+    virtual bool encode_short_jump(
+        std::int64_t displacement,
+        std::vector<std::uint8_t>& bytes,
+        std::string& error
+    ) const {
+        error = "short jump encoding is not supported by this CPU";
+        return false;
+    }
     // Decoding
-    virtual bool decode(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const = 0;
+    virtual bool decode(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const {
+        text = "decoding is not supported by this CPU";
+        return false;
+    }
     
 
 };

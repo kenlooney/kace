@@ -16,6 +16,22 @@
 #include <x86/x86.hpp>
 
 // Encoding
+bool X86::encode_short_jump(
+    std::int64_t displacement,
+    std::vector<std::uint8_t>& bytes,
+    std::string& error
+) const
+{
+    if (displacement < -128 || displacement > 127)
+    {
+        error = "Jump displacement out of range";
+        return false;
+    }
+    bytes.push_back(0xEB); // Short jump opcode
+    bytes.push_back(static_cast<std::uint8_t>(displacement));
+    return true;
+}
+
 bool X86::encode_no_operand(const std::string &name, std::uint8_t &byte) const
 {
     if (name == "nop")
@@ -74,3 +90,6 @@ bool X86::decode(const std::vector<std::uint8_t> &bytes, std::size_t &offset,
     // Unknown instruction
     return false;
 }
+
+
+
