@@ -11,6 +11,7 @@
 #include <sstream>
 #include <filesystem>
 #include <iomanip>
+#include <iterator>
 #include <kace/source.hpp>
 #include <string_view>
 #include "kace/symbols.hpp"
@@ -167,7 +168,7 @@ void showHelpMessage()
                  "  -i, --input  FILE   Input file to assemble or disassemble (also --input=FILE)\n"
                  "  -o, --output FILE   Store the result in a file (also --output=FILE)\n"
                  "  -c, --cpu    CPU    Select a CPU plugin by name (default: x86)\n"
-                 "  -d, --disassemble   Disassemble the input file\n"
+                 "  -d, --disassemble   Decode binary to a .dism file (based on -o or -i)\n"
                  "  --          Treat remaining tokens as arguments\n"
                  "\nKASM's command-line workflow is under development.\n";
 }
@@ -178,9 +179,23 @@ enum class ClientMode
     Disassemble
 };
 
-void disassemble(const std::string &file)
+bool loadCpu(const CommandLine &commandLine, const char *argv0, Loader &loader, std::string &error)
 {
-    std::cout << "Disassembling file: " << file << "\n";
+    const std::string cpuName(commandLine.cpu);
+    if (cpuName.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") != std::string::npos)
+    {
+        std::cerr << "kasm: invalid CPU plugin name: " << cpuName << "\n";
+        return false;
+    }
+    const auto pluginPath = executableDirectory(argv0) /
+                            (std::string(KACE_PLUGIN_PREFIX) + cpuName + KACE_PLUGIN_SUFFIX);
+    if (!loader.open(pluginPath.string(), error))
+    {
+        std::cerr << "kasm: could not load CPU plugin '" << cpuName << "' ("
+                  << pluginPath.string() << "): " << error << "\n";
+        return false;
+    }
+    return true;
 }
 int main(int argc, char *argv[])
 {
@@ -207,6 +222,63 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    if (mode == ClientMode::Disassemble)
+    {
+        if (commandLine.input.empty())
+        {
+            std::cerr << "kasm: an input file is required for disassembly\n";
+            return 1;
+        }
+        const std::filesystem::path inputPath{std::string(commandLine.input)};
+        std::filesystem::path outputPath{std::string(commandLine.output.empty() ? commandLine.input : commandLine.output)};
+        outputPath.replace_extension(".dism");
+        std::error_code pathError;
+        if (std::filesystem::equivalent(inputPath, outputPath, pathError))
+        {
+            std::cerr << "kasm: disassembly output must differ from the input file\n";
+            return 1;
+        }
+        std::ifstream input(inputPath, std::ios::binary);
+        if (!input)
+        {
+            std::cerr << "kasm: could not open input file: " << inputPath.string() << "\n";
+            return 1;
+        }
+        const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+        if (input.bad())
+        {
+            std::cerr << "kasm: could not read input file: " << inputPath.string() << "\n";
+            return 1;
+        }
+        Loader loader;
+        std::string error;
+        if (!loadCpu(commandLine, argv[0], loader, error)) return 1;
+
+        std::ostringstream decoded;
+        std::size_t offset = 0;
+        while (offset < bytes.size())
+        {
+            const std::size_t start = offset;
+            std::string text;
+            if (!loader.cpu()->decode(bytes, offset, text) || offset <= start || offset > bytes.size())
+            {
+                std::cerr << "kasm: could not decode instruction at byte offset " << start << "\n";
+                return 1;
+            }
+            decoded << text << '\n';
+        }
+        std::ofstream output(outputPath, std::ios::binary);
+        if (output) output << decoded.str();
+        output.close();
+        if (!output)
+        {
+            std::cerr << "kasm: could not write output file: " << outputPath.string() << "\n";
+            return 1;
+        }
+        std::cout << "wrote " << outputPath.string() << "\n";
+        return 0;
+    }
+
     std::vector<Statement> statements;
     std::string error;
     if (!commandLine.output.empty() && commandLine.input.empty())
@@ -222,12 +294,6 @@ int main(int argc, char *argv[])
             std::cerr << "kasm: could not open input file: " << commandLine.input << "\n";
             return 1;
         }
-        if (mode == ClientMode::Disassemble)
-        {
-            // Disassemble input file
-            disassemble(std::string(commandLine.input));
-            return 0; // Exit after disassembling
-        }
         const std::vector<Token> tokens;
         KasmParser parser(tokens);
         if (!parser.parse(source, statements, error))
@@ -239,21 +305,8 @@ int main(int argc, char *argv[])
     }
     if (!commandLine.output.empty())
     {
-        const std::string cpuName(commandLine.cpu);
-        if (cpuName.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") != std::string::npos)
-        {
-            std::cerr << "kasm: invalid CPU plugin name: " << cpuName << "\n";
-            return 1;
-        }
-        const auto pluginPath = executableDirectory(argv[0]) /
-                                (std::string(KACE_PLUGIN_PREFIX) + cpuName + KACE_PLUGIN_SUFFIX);
         Loader loader;
-        if (!loader.open(pluginPath.string(), error))
-        {
-            std::cerr << "kasm: could not load CPU plugin '" << cpuName << "' ("
-                      << pluginPath.string() << "): " << error << "\n";
-            return 1;
-        }
+        if (!loadCpu(commandLine, argv[0], loader, error)) return 1;
 
         SymbolTable symbolTable;
         std::vector<std::uint8_t> bytes;

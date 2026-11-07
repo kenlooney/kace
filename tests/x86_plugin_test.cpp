@@ -41,22 +41,25 @@ int main() {
         std::cerr << "x86 accepted invalid immediate operands\n";
         return 1;
     }
-    const std::vector<std::uint8_t> instructions{0x90, 0xB0, 42};
+    const std::vector<std::uint8_t> instructions{0xEB, 0x01, 0x90, 0xEB, 0xFB, 0xB0, 42};
     std::size_t offset = 0;
     std::string text;
-    if (!cpu.decode(instructions, offset, text) || text != "nop" || offset != 1 ||
-        !cpu.decode(instructions, offset, text) || text != "mov al, 42" || offset != 3 ||
-        cpu.decode(instructions, offset, text) || offset != 3) {
+    if (!cpu.decode(instructions, offset, text) || text != "jmp 1" || offset != 2 ||
+        !cpu.decode(instructions, offset, text) || text != "nop" || offset != 3 ||
+        !cpu.decode(instructions, offset, text) || text != "jmp -5" || offset != 5 ||
+        !cpu.decode(instructions, offset, text) || text != "mov al, 42" || offset != 7 ||
+        cpu.decode(instructions, offset, text) || offset != 7) {
         std::cerr << "x86 failed to decode instruction sequence\n";
         return 1;
     }
     for (const std::vector<std::uint8_t> invalid :
-         {std::vector<std::uint8_t>{0xB0}, std::vector<std::uint8_t>{0xFF}}) {
+         {std::vector<std::uint8_t>{0xB0}, std::vector<std::uint8_t>{0xEB}, std::vector<std::uint8_t>{0xFF}}) {
         offset = 0;
         if (cpu.decode(invalid, offset, text) || offset != 0) {
             std::cerr << "x86 accepted incomplete or unknown instruction\n";
             return 1;
         }
     }
+    std::cout << "Decoded forward and backward short jumps; rejected incomplete jump\n";
     return 0;
 }

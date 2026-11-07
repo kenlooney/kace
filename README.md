@@ -94,8 +94,18 @@ mode selection is not yet connected to the CLI.
 The parser accepts immediate `mov` expressions,
 and the x86 plugin can encode `mov al` with an 8-bit immediate, but that
 encoding is not yet connected to the CLI's output path. Similarly, the x86
-plugin can decode `nop` and `mov al, immediate`; the CLI's `--disassemble`
-option is currently a placeholder and does not decode the input.
+plugin can decode `nop`, `mov al, immediate`, and short jumps. To disassemble
+an existing binary into a text file, run:
+
+```powershell
+.\bin\Debug\kasm.exe --disassemble -i example.bin
+```
+
+This writes `example.dism` next to the input. To choose a different name or
+directory, pass `-o`; its extension is replaced with `.dism`. Decoded jumps
+show their relative displacement, not the original label name, and are not yet
+directly reassemblable. Unknown or incomplete instructions stop decoding with
+an error and do not replace an existing output file.
 
 ## Building
 
@@ -147,7 +157,7 @@ Planned development includes:
 - Output for word, double-word, and quad-word data definitions
 - Near and far jumps, broader label resolution, and duplicate-label diagnostics
 - CPU mode selection and mode-aware encoding
-- Connecting immediate encoding and disassembly to the CLI
+- Connecting immediate encoding to the CLI and expanding disassembly
 - More instructions, registers, and addressing modes
 - A complete KASM command-line workflow
 - Stable releases and packaged distributions
