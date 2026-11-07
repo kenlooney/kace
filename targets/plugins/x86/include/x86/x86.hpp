@@ -40,9 +40,16 @@ class X86 : public Cpu {
     ) const override;
 
     // Decoding
-    bool decode(const std::vector<std::uint8_t>& bytes, std::size_t& offset,
-                std::string& text) const override;
-
+    bool decode(
+        const std::vector<std::uint8_t>& bytes,
+        std::size_t& offset,
+        std::string& text
+    ) const override;
+    bool decode_no_operand(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
+    bool decode_short_jump(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
+    bool decode_immediate(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
+   
+   
     // Other Public Functions
     X86Mode getMode() const { return mode; }
     void setMode(X86Mode newMode) { mode = newMode; }

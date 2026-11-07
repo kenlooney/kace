@@ -64,14 +64,30 @@ bool X86::encode_immediate(
 }
 
 // Decoding
-bool X86::decode(const std::vector<std::uint8_t> &bytes, std::size_t &offset,
-                 std::string &text) const
-{
-    // Check if there are enough bytes to decode
+bool X86::decode(
+    const std::vector<std::uint8_t>& bytes,
+    std::size_t& offset,
+    std::string& text
+) const {
     if (offset >= bytes.size())
         return false;
 
-    // Decode NOP instruction
+    switch (bytes[offset]) {
+    case 0x90:
+        return decode_no_operand(bytes, offset, text);
+    case 0xB0:
+        return decode_immediate(bytes, offset, text);
+    case 0xEB:
+        return decode_short_jump(bytes, offset, text);
+    default:
+        return false;
+    }
+}
+bool X86::decode_no_operand(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const
+{
+    if (offset >= bytes.size())
+        return false;
+
     if (bytes[offset] == 0x90)
     {
         ++offset;
@@ -79,17 +95,37 @@ bool X86::decode(const std::vector<std::uint8_t> &bytes, std::size_t &offset,
         return true;
     }
 
-    // Decode MOV AL, immediate instruction
-    if (bytes[offset] == 0xB0 && offset + 1 < bytes.size())
-    {
-        text = "mov al, " + std::to_string(bytes[offset + 1]);
-        offset += 2;
-        return true;
-    }
-
-    // Unknown instruction
     return false;
 }
 
+bool X86::decode_immediate(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const
+{
+    if (offset + 1 >= bytes.size())
+        return false;
 
+    if (bytes[offset] == 0xB0)
+    {
+        std::uint8_t value = bytes[offset + 1];
+        offset += 2;
+        text = "mov al, " + std::to_string(value);
+        return true;
+    }
+
+    return false;
+}
+bool X86::decode_short_jump(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const
+{
+    if (offset + 1 >= bytes.size())
+        return false;
+
+    if (bytes[offset] == 0xEB)
+    {
+        std::int8_t displacement = static_cast<std::int8_t>(bytes[offset + 1]);
+        offset += 2;
+        text = "jmp " + std::to_string(displacement);
+        return true;
+    }
+
+    return false;
+}
 

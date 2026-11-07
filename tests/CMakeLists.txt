@@ -89,3 +89,10 @@ add_test(
           -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}
           -P ${CMAKE_CURRENT_SOURCE_DIR}/kasm_short_jump_cli_test.cmake
 )
+add_test(
+  NAME kasm_disassemble_cli_test
+  COMMAND ${CMAKE_COMMAND}
+          -DKASM=$<TARGET_FILE:kasm>
+          -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/kasm_disassemble_cli_test.cmake
+)
