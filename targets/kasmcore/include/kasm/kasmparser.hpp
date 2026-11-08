@@ -49,6 +49,8 @@ public:
         keywords_table.addto_alias("times", "fill");
         keywords_table.addto_alias("times", "repeat");
         keywords_table.addto_alias("times", "dup");
+        keywords_table.addto_alias("$", "currentposition");
+        keywords_table.addto_alias("$$", "sectionstart");
         keywords_table.addto_alias("db", "definebyte");
         keywords_table.addto_alias("db", "byte");
         keywords_table.addto_alias("dw", "defineword");

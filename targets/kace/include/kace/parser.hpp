@@ -57,6 +57,8 @@ public:
         add_alias("dw", {"dw"});
 
         add_alias("times", {"times"});
+        add_alias("$", {"$"});
+        add_alias("$$", {"$$"});
         add_alias("jmp", {"jmp"});
        
     }
