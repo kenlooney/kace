@@ -106,9 +106,15 @@
           <p>KASM is the first assembler being developed with KACE. It explores familiar assembly ideas alongside
             a language that has more meaning and syntax then your typical assemblers. The language created for the assembler is ment to be very user and kid friendly with simple and intuitive constructs, making it easier to understand and use. My goal is to have it great as a learning tool that young people can pick up easily and enjoy.</p>
           <p>Choices that read a little more naturally—like using <code>sum</code> for addition or
-            <code>copy</code> and <code>move</code> as an alias for <code>mov</code> and <code>define</code> to define byte widths. Instead of using <code>db</code>, which is ambiguous, the language opts for more descriptive constructs. Is <code>db</code> supposed to mean <i>drop byte</i> or <i>define byte</i>? it has no meaning! It’s about making the code more understandable and meaningful for the user.</p>
+            <code>copy</code> and <code>move</code> as aliases for <code>mov</code>. Write <code>byte 5</code>,
+            <code>definebyte 5</code>, or the familiar <code>db 5</code> to emit a byte.</p>
+          <p>Repeat bytes with <code>fill 4 byte 0</code>; <code>times</code>, <code>repeat</code>, and
+            <code>dup</code> work too. For padding, <code>fill 10 - (currentposition - sectionstart) byte 0</code>
+            fills to offset 10. The shorter <code>$</code> and <code>$$</code> spellings are also supported.
+            Repetition currently emits bytes only, with a limit of one million per directive. In flat output,
+            <code>sectionstart</code> is zero.</p>
           <p>KASM can resolve short and 16-bit near jumps to labels before or after an instruction. Use
-            <code>jmp short</code> or <code>jmp near</code>; <code>jump</code> and <code>goto</code> are aliases
+            <code>jmp short</code> or <code>jmp near</code>; <code>jump</code> is an alias
             for <code>jmp</code>. KASM also assembles and disassembles 16-bit far jumps such as
             <code>jmp far 0x1234:0x5678</code>, using numeric segment and offset values.
           </p>
@@ -116,7 +122,7 @@
             Assembly saves labels in a matching <code>.sym</code> file, which the disassembler can use to restore
             short- and near-jump targets. Without the symbol file, those jumps show their relative displacement.
             Disassembly uses standard instruction names like <code>jmp</code>, even when the source used
-            an alias such as <code>jump</code> or <code>goto</code>.
+            an alias such as <code>jump</code>.
           </p><a class="inline-link" href="#download">EXPLORE RELEASES <span>↗</span></a>
         </div>
         <div class="code-card">

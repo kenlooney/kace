@@ -25,6 +25,11 @@
 #include <vector>
 #include <kace/statement.hpp>
 
+struct PositionContext
+{
+    std::uint64_t current;
+    std::uint64_t sectionStart;
+};
 
 class OperatorTable : public AliasTable {
 public:
@@ -93,6 +98,8 @@ public:
     bool number(std::size_t& node, std::string& error);
     bool sum(std::size_t& node, std::string& error);
     bool product(std::size_t& node, std::string& error);
+    bool parse_expression_tree(Expression& expression, std::string& error);
+    
     bool parse_expression(Expression& expression, std::string& error);
     bool parse_expression(
         Expression& expression,
@@ -100,7 +107,7 @@ public:
         std::string& error
     );
     bool parse_expression(std::uint64_t& value, std::string& error);
-    bool evaluate(const Expression& expression, std::size_t node, std::uint64_t& value, std::string& error);
+    bool evaluate(const Expression& expression, std::size_t node, std::uint64_t& value, std::string& error, const PositionContext* positions = nullptr);
     OperatorTable ops_table;
     KeywordTable keywords_table;
 
