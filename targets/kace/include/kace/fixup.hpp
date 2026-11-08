@@ -17,8 +17,15 @@
 #include <cstddef>
 #include <string>
 
+enum class JumpKind {
+    Short,
+    Near,
+    Far
+};
+
 struct JumpFixup {
     std::string target;
     std::size_t offset; // Where the jump starts in the output
     std::size_t line;   // For error messages
+    JumpKind kind = JumpKind::Short;
 };

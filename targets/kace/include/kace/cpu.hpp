@@ -44,6 +44,16 @@ public:
         error = "short jump encoding is not supported by this CPU";
         return false;
     }
+    virtual bool encode_near_jump(
+        std::int64_t displacement,
+        std::vector<std::uint8_t> &bytes,
+        std::string &error) const
+    {
+        error = "near jump encoding is not supported by this CPU";
+        return false;
+    }
+
+
     // Decoding
     virtual bool decode(
         const std::vector<std::uint8_t> &,
@@ -67,8 +77,17 @@ public:
         text = "short jump decoding is not supported by this CPU";
         return false;
     }
+    virtual bool decode_near_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+    {
+        text = "near jump decoding is not supported by this CPU";
+        return false;
+    }
     // Reports the displacement only when the instruction at offset is a short jump.
     virtual bool short_jump_displacement(const std::vector<std::uint8_t>&, std::size_t, std::int64_t&) const
+    {
+        return false;
+    }
+    virtual bool near_jump_displacement(const std::vector<std::uint8_t>&, std::size_t, std::int64_t&) const
     {
         return false;
     }

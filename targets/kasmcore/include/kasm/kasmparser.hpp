@@ -149,15 +149,15 @@ public:
                 const std::string &type = tokens[1].text;
                 if (type == "short")
                     statement.kind = StatementKind::JumpShort;
-                // else if (type == "near")
-                //     statement.kind = StatementKind::JumpNear;
+                else if (type == "near")
+                    statement.kind = StatementKind::JumpNear;
                 // else if (type == "far")
                 //     statement.kind = StatementKind::JumpFar;
                 else
                 {
                     error = source.name + ":" +
                             std::to_string(line_number) +
-                            ": Expected a jump type short (near, far types are not supported)";
+                            ": Expected a jump type of short or near (far jumps are not supported)";
                     return false;
                 }
                 statement.target = tokens[2].text;

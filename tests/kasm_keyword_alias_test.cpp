@@ -38,7 +38,13 @@ int main() {
     for (const auto& statement : statements) {
         if (statement.name != "jmp" || statement.target != "done") return 1;
     }
-    for (const std::string& invalid : {"jmp short", "jmp short 42", "jmp short done extra", "jmp wide done", "jmp near done", "jmp far done"}) {
+    source.text = "jmp near done";
+    if (!parser.parse(source, statements, error) || statements.size() != 1 ||
+        statements[0].kind != StatementKind::JumpNear || statements[0].target != "done") {
+        std::cerr << "Near jump did not parse correctly\n";
+        return 1;
+    }
+    for (const std::string& invalid : {"jmp short", "jmp short 42", "jmp short done extra", "jmp wide done", "jmp far done"}) {
         source.text = invalid;
         if (parser.parse(source, statements, error)) {
             std::cerr << "Invalid jump accepted: " << invalid << '\n';

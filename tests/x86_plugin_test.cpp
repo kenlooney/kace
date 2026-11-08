@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <utility>
 
 int main() {
     X86 x86;
@@ -40,6 +41,18 @@ int main() {
         cpu.encode_immediate("add", "al", 42, bytes, error) || !bytes.empty()) {
         std::cerr << "x86 accepted invalid immediate operands\n";
         return 1;
+    }
+    for (const auto& test : {std::pair<std::int64_t, std::vector<std::uint8_t>>{0x1234, {0xE9, 0x34, 0x12}},
+                             {-5, {0xE9, 0xFB, 0xFF}}}) {
+        std::vector<std::uint8_t> encoded;
+        std::size_t position = 0;
+        std::string decoded;
+        if (!cpu.encode_near_jump(test.first, encoded, error) || encoded != test.second ||
+            !cpu.decode(encoded, position, decoded) || position != 3 ||
+            decoded != "jmp " + std::to_string(test.first)) {
+            std::cerr << "Near jump encoding or decoding failed\n";
+            return 1;
+        }
     }
     const std::vector<std::uint8_t> instructions{0xEB, 0x01, 0x90, 0xEB, 0xFB, 0xB0, 42};
     std::size_t offset = 0;
