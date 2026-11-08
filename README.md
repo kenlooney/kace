@@ -38,9 +38,9 @@ assembly concepts.
 
 - Byte-range semantic validation and raw binary output for byte definitions
 - A CPU plugin interface with default unsupported-operation implementations,
-  and an x86 plugin that encodes `nop` and short jumps
+  and an x86 plugin that encodes `nop`, short jumps, and 16-bit near jumps
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
-- Label recognition, offset recording, and short-jump fixups, plus a symbol
+- Label recognition, offset recording, and short- and near-jump fixups, plus a symbol
   table with save/load helpers
 - Extensible keyword and operator alias tables
 - CTest-based automated tests
@@ -82,8 +82,13 @@ The jump aliases `jump` and `goto` are also recognized. KASM reserves two
 bytes per short jump, then resolves each target after recording labels. The
 x86 plugin emits `EB` and a signed 8-bit displacement relative to the end of
 the jump. Unknown labels and displacements outside -128 through 127 are
-reported before the output file is opened. Near and far jumps are not yet
-supported. Duplicate label definitions are reported as errors.
+reported before the output file is opened. Duplicate label definitions are
+reported as errors.
+
+KASM also accepts `jmp near label` (and its `jump` and `goto` aliases). The
+x86 plugin's current near form uses the 16-bit `E9` encoding: a three-byte
+instruction with a signed 16-bit displacement, from -32768 through 32767,
+relative to the end of the instruction. Far jumps are not yet supported.
 Each successful assembly writes a `.sym` symbol file next to the output binary,
 using the same filename with its extension replaced (for example,
 `example.bin` and `example.sym`). Keep these files together.
@@ -112,7 +117,8 @@ mode selection is not yet connected to the CLI.
 The parser accepts immediate `mov` expressions,
 and the x86 plugin can encode `mov al` with an 8-bit immediate, but that
 encoding is not yet connected to the CLI's output path. Similarly, the x86
-plugin can decode `nop`, `mov al, immediate`, and short jumps. To disassemble
+plugin can decode `nop`, `mov al, immediate`, short jumps, and 16-bit near
+jumps. To disassemble
 an existing binary into a text file, run:
 
 ```powershell
@@ -123,7 +129,9 @@ This writes `example.dism` next to the input and automatically reads
 `example.sym` if present. To choose a different output name or directory,
 pass `-o`; its extension is replaced with `.dism`. Without a matching symbol
 file, jumps show numeric relative displacements and are not directly
-reassemblable. Keep the symbol file paired with its binary: KASM does not
+reassemblable. Named target restoration currently applies to short jumps;
+near jumps are displayed with a numeric displacement even when symbols are
+available. Keep the symbol file paired with its binary: KASM does not
 verify that they match. Unknown or incomplete instructions stop decoding with
 an error and do not replace an existing output file.
 
@@ -176,7 +184,7 @@ examples/     Example assembly source files
 Planned development includes:
 
 - Output for word, double-word, and quad-word data definitions
-- Near and far jumps and broader label resolution
+- Far jumps, near-jump target restoration during disassembly, and broader label resolution
 - CPU mode selection and mode-aware encoding
 - Connecting immediate encoding to the CLI and expanding disassembly
 - More instructions, registers, and addressing modes
