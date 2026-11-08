@@ -52,9 +52,11 @@ public:
 class KeywordTable : public AliasTable {
 public:
     KeywordTable() {
-        add_alias("mov", {"mov","move","copy"});
-        add_alias("define", {"define"});
-        add_alias("db", {"db","define_byte"});
+        add_alias("mov", {"mov"});
+        add_alias("db", {"db"});
+        add_alias("dw", {"dw"});
+
+        add_alias("times", {"times"});
         add_alias("jmp", {"jmp"});
        
     }

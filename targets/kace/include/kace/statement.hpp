@@ -21,6 +21,7 @@ enum class StatementKind {
     JumpShort,
     JumpNear,
     JumpFar,
+    Times,
 };
 struct Statement {
     std::string name;
@@ -34,6 +35,7 @@ struct Statement {
     std::string target; // For jump statements, the label or address to jump to
     std::uint64_t farSegment = 0;
     std::uint64_t farOffset = 0;
+    std::uint64_t count = 0;
 };
 
 bool parse_statement(const std::vector<Token>& tokens, Statement& statement, std::string& error);
