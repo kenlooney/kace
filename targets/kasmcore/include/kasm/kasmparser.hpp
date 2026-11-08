@@ -43,12 +43,13 @@ public:
         keywords_table.addto_alias("jmp", "jump");
         keywords_table.addto_alias("mov", "move");
         keywords_table.addto_alias("mov", "copy");
-         
-        
+
         // Keyword directives
         keywords_table.addto_alias("times", "fill");
         keywords_table.addto_alias("times", "repeat");
         keywords_table.addto_alias("times", "dup");
+        keywords_table.addto_alias("$", "currentposition");
+        keywords_table.addto_alias("$$", "sectionstart");
         keywords_table.addto_alias("db", "definebyte");
         keywords_table.addto_alias("db", "byte");
         keywords_table.addto_alias("dw", "defineword");
@@ -124,31 +125,58 @@ public:
 
             if (statement.name == "times")
             {
+                
                 statement.kind = StatementKind::Times;
-                if (tokens.size() < 4 || tokens[1].kind != "integer" ||
-                    tokens[2].text != "db")
+                std::size_t byte_index = 1;
+                std::string data_directive;
+                while (byte_index < tokens.size())
+                {
+                    const std::string &spelling = tokens[byte_index].text;
+                    for (const Alias &keyword : keywords_table.aliases())
+                    {
+                        if (keyword.symbol != "db" && keyword.symbol != "dw" &&
+                            keyword.symbol != "dd" && keyword.symbol != "dq")
+                            continue;
+                        if (spelling == keyword.symbol)
+                            data_directive = keyword.symbol;
+                        for (const std::string &alias : keyword.values)
+                            if (spelling == alias)
+                                data_directive = keyword.symbol;
+                    }
+                    if (!data_directive.empty() || spelling == "dd" || spelling == "dq")
+                    {
+                        break;
+                    }
+                    ++byte_index;
+                }
+                if (byte_index == 1 || byte_index == tokens.size() || byte_index + 1 == tokens.size())
                 {
                     error = source.name + ":" + std::to_string(line_number) +
-                            ": Expected times count db expression";
+                            ": Expected repetition count, data directive, and a value";
                     return false;
                 }
-                if (!parse_integer(tokens[1].text, statement.count))
+                std::vector<Token> count_tokens(
+                    tokens.begin() + 1,
+                    tokens.begin() + byte_index);
+                operand_start = byte_index + 1;
+
+                if (data_directive != "db")
                 {
                     error = source.name + ":" + std::to_string(line_number) +
-                            ": Invalid repeat count";
+                            ": Only byte repetition is supported";
                     return false;
                 }
-                if (statement.count > 1000000)
+
+                KasmParser count_parser(count_tokens);
+                if (!count_parser.parse_expression_tree(statement.countExpression, error))
                 {
-                    error = source.name + ":" + std::to_string(line_number) +
-                            ": Repeat count exceeds the limit";
+                    error = source.name + ":" + std::to_string(line_number) + ": " + error;
                     return false;
                 }
+
                 statement.type = DataType::Byte;
-                operand_start = 3;
             }
-          
-          
+
             if (statement.name == "mov")
             {
                 // move/copy/mov <expression> into <register>

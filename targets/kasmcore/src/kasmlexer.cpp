@@ -70,6 +70,8 @@ std::vector<Token> KasmLexer::tokenize(const std::string& input) {
             continue;
         }
 
+
+
        // Handle identifiers
        // Identifiers must start with a letter and can contain letters, digits, or underscores
        if(is_letter(ch)) {
@@ -175,7 +177,18 @@ std::vector<Token> KasmLexer::tokenize(const std::string& input) {
            continue;
        }
 
-    
+        // Handle '$' and '$$' as special identifiers
+        if(ch == '$') {
+            begin = cursor;
+            ++cursor;
+            if(cursor < input.size() && input[cursor] == '$') {
+                ++cursor;
+                addToken(Token{"dollardollar", "$$", Span{begin, cursor}});
+            } else {
+                addToken(Token{"dollar", "$", Span{begin, cursor}});
+            }
+            continue;
+        }
 
        ++cursor;
         addToken(Token{"punctuation", input.substr(cursor - 1, 1), Span{begin, cursor}});

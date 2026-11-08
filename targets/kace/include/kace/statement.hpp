@@ -36,6 +36,7 @@ struct Statement {
     std::uint64_t farSegment = 0;
     std::uint64_t farOffset = 0;
     std::uint64_t count = 0;
+    Expression countExpression; // For times directive, the expression representing the repeat count
 };
 
 bool parse_statement(const std::vector<Token>& tokens, Statement& statement, std::string& error);

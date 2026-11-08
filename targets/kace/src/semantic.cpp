@@ -14,12 +14,17 @@
  * GNU General Public License for more details.
  */
 #include <kace/semantic.hpp>
+#include <kace/statement.hpp>
 
 bool check_byte(const Statement& statement, std::uint8_t& byte, std::string& error) {
     const bool is_define_byte =
         statement.name == "define" && statement.type == DataType::Byte;
     const bool is_legacy_db = statement.name == "db";
-    if (!is_define_byte && !is_legacy_db) {
+    const bool is_times_byte = statement.kind == StatementKind::Times && (
+        statement.type == DataType::Byte
+    );
+
+    if (!is_define_byte && !is_legacy_db && !is_times_byte) {
         error = "Expected a byte definition";
         return false;
     }

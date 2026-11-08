@@ -28,15 +28,16 @@ assembly concepts.
 - Expression parsing with operator precedence and grouping
 - AST-backed expression evaluation
 - Multiline source parsing with line-aware diagnostics
-- Named data definitions, including:
+- Byte definitions with `byte`, `definebyte`, or `db`, including:
 
   ```asm
-  define byte 3 sum 2
-  define byte 12 mul 4
-  define byte ((8 take 3) mul 2)
+  byte 3 sum 2
+  definebyte 12 mul 4
+  db ((8 take 3) mul 2)
   ```
 
 - Byte-range semantic validation and raw binary output for byte definitions
+- Repeated byte definitions and position-based padding with `times`, `fill`, `repeat`, or `dup`
 - A CPU plugin interface with default unsupported-operation implementations,
   and an x86 plugin that encodes `nop`, short jumps, and 16-bit near and far jumps
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
@@ -53,8 +54,8 @@ For example, save this as `example.asm`:
 ```asm
 start:
 nop
-define byte 3 sum 2
-define_byte 7
+byte 3 sum 2
+definebyte 7
 nop
 ```
 
@@ -68,6 +69,35 @@ The output is the raw byte sequence `90 05 07 90`. The CPU defaults to
 `x86`; use `-c` or `--cpu` to select a plugin. Run `kasm --help` for CLI
 options. The plugin and shared libraries must be next to the executable.
 
+### Repeating bytes and padding
+
+Use `times`, `fill`, `repeat`, or `dup` with a count expression, a byte
+directive (`byte`, `definebyte`, or `db`), and a value expression:
+
+```asm
+fill 4 byte 0
+repeat 3 definebyte 2 sum 1
+```
+
+These lines emit `00 00 00 00 03 03 03`. The count can be zero and is
+limited to 1,000,000 repetitions per directive. The value must fit in one
+byte; repeating wider data types is not yet supported.
+
+For padding, `currentposition` (or `$`) is the output offset at the start
+of the directive. `sectionstart` (or `$$`) is zero in the current flat output;
+sections are not yet implemented. The count is evaluated when the directive
+is emitted:
+
+```asm
+nop
+fill 10 - (currentposition - sectionstart) byte 0
+byte 0x55
+```
+
+The `nop` emits one byte, the `fill` adds nine zero bytes, and the final
+byte brings the total to eleven. If the output is already past the requested
+position, the subtraction reports an error instead of wrapping.
+
 Labels on their own lines are recorded while output is generated. A short
 jump can refer to a label before or after the jump:
 
@@ -79,20 +109,20 @@ done:
 jmp short start
 ```
 
-The jump aliases `jump` and `goto` are also recognized. KASM reserves two
+The jump alias `jump` is also recognized. KASM reserves two
 bytes per short jump, then resolves each target after recording labels. The
 x86 plugin emits `EB` and a signed 8-bit displacement relative to the end of
 the jump. Unknown labels and displacements outside -128 through 127 are
 reported before the output file is opened. Duplicate label definitions are
 reported as errors.
 
-KASM also accepts `jmp near label` (and its `jump` and `goto` aliases). The
+KASM also accepts `jmp near label` (and its `jump` alias). The
 x86 plugin's current near form uses the 16-bit `E9` encoding: a three-byte
 instruction with a signed 16-bit displacement, from -32768 through 32767,
 relative to the end of the instruction.
 
 KASM also assembles far jumps such as `jmp far 0x1234:0x5678`, with integer
-literals for the segment and offset. The `jump` and `goto` aliases work here
+literals for the segment and offset. The `jump` alias works here
 too. In the x86 plugin's default 16-bit mode, both values must fit in 16 bits;
 the example encodes as `EA 78 56 34 12`. Far jumps are disassembled with their
 numeric segment and offset and do not require label fixups. Other modes are
@@ -114,7 +144,7 @@ jmp short start
 
 The symbol file supplies label names and offsets; the raw binary does not store
 them. Disassembly uses canonical instruction names
-such as `jmp`, even when the source used an alias such as `jump` or `goto`.
+such as `jmp`, even when the source used an alias such as `jump`.
 The original spelling is not preserved in the binary.
 
 The CPU interface provides default implementations that report unsupported
@@ -170,8 +200,8 @@ ctest --test-dir build --output-on-failure -C Debug
 
 The test suite covers source loading, diagnostics, lexing, expression and
 statement parsing, CLI output, CPU plugins, x86 encoding and decoding, and
-symbol table persistence. The CLI tests also cover short- and near-jump assembly and
-disassembly, including failure cases. Use CTest's `-V` option to show output
+symbol table persistence. The CLI tests also cover jumps and position-based
+padding, including failure cases. Use CTest's `-V` option to show output
 from passing tests, or select a test in CMake Tools' Test Explorer.
 
 ## Repository Layout
