@@ -316,7 +316,7 @@ int main(int argc, char *argv[])
                     decoded << name << ":\n";
             std::int64_t displacement = 0;
             std::string text = instruction.text;
-            const char* jumpType = nullptr;
+            const char *jumpType = nullptr;
             if (loader.cpu()->short_jump_displacement(bytes, instruction.offset, displacement))
                 jumpType = "short";
             else if (loader.cpu()->near_jump_displacement(bytes, instruction.offset, displacement))
@@ -344,7 +344,7 @@ int main(int argc, char *argv[])
 
             decoded << text << '\n';
         }
-        
+
         const auto endLabels = labels.find(bytes.size());
         if (endLabels != labels.end())
             for (const auto &name : endLabels->second)
@@ -436,19 +436,45 @@ int main(int argc, char *argv[])
                 bytes.insert(bytes.end(), encoded.begin(), encoded.end());
                 continue;
             }
+
             // Times directive handling
             std::uint8_t byte = 0;
+
             if (statement.kind == StatementKind::Times)
             {
-                if(!check_byte(statement, byte, error))
+                if (!check_byte(statement, byte, error))
                 {
-                    std::cerr << commandLine.input << ":" << statement.line << ": " << error << "\n";
+                    std::cerr << commandLine.input << ":" << statement.line
+                              << ": " << error << "\n";
                     return 1;
                 }
+
+                Parser evaluator(std::vector<Token>{});
+                PositionContext positions{statement.offset, 0};
+
+                if (!evaluator.evaluate(
+                        statement.countExpression,
+                        statement.countExpression.root,
+                        statement.count,
+                        error,
+                        &positions))
+                {
+                    std::cerr << commandLine.input << ":" << statement.line
+                              << ": " << error << "\n";
+                    return 1;
+                }
+
+                if (statement.count > 1000000)
+                {
+                    std::cerr << commandLine.input << ":" << statement.line
+                              << ": Repeat count exceeds the limit\n";
+                    return 1;
+                }
+
                 bytes.insert(bytes.end(), statement.count, byte);
                 continue;
             }
-          
+
             if (!encode_statement(statement, *loader.cpu(), byte, error))
             {
                 std::cerr << commandLine.input << ":" << statement.line << ": " << error << "\n";

@@ -18,6 +18,7 @@
 #include <sstream>
 #include <kace/source.hpp>
 #include <sstream>
+#include <limits>
 
 void Parser::add_operator_alias(
     const std::string &symbol,
@@ -74,6 +75,34 @@ bool Parser::number(std::size_t &node, std::string &error)
         }
     }
 
+    auto matches_keyword = [&](const std::string &symbol)
+    {
+        const Alias *entry = keywords_table.get_keyword_alias(symbol);
+        if (entry == nullptr || pos >= tokens.size())
+            return false;
+
+        for (const std::string &spelling : entry->values)
+        {
+            if (tokens[pos].text == spelling)
+                return true;
+        }
+        return false;
+    };
+
+    if (pos < tokens.size() && matches_keyword("$"))
+    {
+        node = tree->nodes.size();
+        tree->nodes.push_back(Node{"current_position", 0, node, node});
+        ++pos;
+        return true;
+    }
+    if (pos < tokens.size() && matches_keyword("$$"))
+    {
+        node = tree->nodes.size();
+        tree->nodes.push_back(Node{"section_start", 0, node, node});
+        ++pos;
+        return true;
+    }
     if (pos >= tokens.size() || tokens[pos].kind != "integer")
     {
         error = "Expected an integer";
@@ -251,7 +280,7 @@ bool Parser::evaluate(
     const Expression &expression,
     std::size_t node,
     std::uint64_t &value,
-    std::string &error)
+    std::string &error, const PositionContext *positions)
 {
     if (node >= expression.nodes.size())
     {
@@ -265,25 +294,54 @@ bool Parser::evaluate(
         value = current.value;
         return true;
     }
+    if (current.kind == "current_position" || current.kind == "section_start")
+    {
+        if (positions == nullptr)
+        {
+            error = "Position is not available in this expression";
+            return false;
+        }
+
+        value = current.kind == "current_position"
+                    ? positions->current
+                    : positions->sectionStart;
+        return true;
+    }
 
     std::uint64_t left = 0;
     std::uint64_t right = 0;
-    if (!evaluate(expression, current.left, left, error) ||
-        !evaluate(expression, current.right, right, error))
+    if (!evaluate(expression, current.left, left, error, positions) ||
+        !evaluate(expression, current.right, right, error, positions))
     {
         return false;
     }
 
     if (current.kind == "+")
     {
+        if (left > std::numeric_limits<std::uint64_t>::max() - right)
+        {
+            error = "Addition overflow";
+            return false;
+        }
         value = left + right;
     }
     else if (current.kind == "-")
     {
+        if (right > left)
+        {
+            error = "Subtraction would produce a negative value";
+            return false;
+        }
+
         value = left - right;
     }
     else if (current.kind == "*")
     {
+        if (right != 0 && left > std::numeric_limits<std::uint64_t>::max() / right)
+        {
+            error = "Multiplication overflow";
+            return false;
+        }
         value = left * right;
     }
     else if (current.kind == "/")
@@ -325,6 +383,25 @@ bool Parser::parse_expression(
 
     std::uint64_t value = 0;
     return run(value, error);
+}
+
+bool Parser::parse_expression_tree(Expression &expression, std::string &error)
+{
+    tree = &expression;
+    tree->nodes.clear();
+    tree->root = 0;
+    pos = 0;
+
+    if (!sum(tree->root, error))
+        return false;
+
+    if (pos != tokens.size())
+    {
+        error = "Unexpected token: " + tokens[pos].text;
+        return false;
+    }
+
+    return true;
 }
 
 bool Parser::parse_expression(
