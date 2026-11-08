@@ -436,7 +436,19 @@ int main(int argc, char *argv[])
                 bytes.insert(bytes.end(), encoded.begin(), encoded.end());
                 continue;
             }
+            // Times directive handling
             std::uint8_t byte = 0;
+            if (statement.kind == StatementKind::Times)
+            {
+                if(!check_byte(statement, byte, error))
+                {
+                    std::cerr << commandLine.input << ":" << statement.line << ": " << error << "\n";
+                    return 1;
+                }
+                bytes.insert(bytes.end(), statement.count, byte);
+                continue;
+            }
+          
             if (!encode_statement(statement, *loader.cpu(), byte, error))
             {
                 std::cerr << commandLine.input << ":" << statement.line << ": " << error << "\n";
@@ -444,8 +456,8 @@ int main(int argc, char *argv[])
             }
             bytes.push_back(byte);
         }
-        // Pass 2 - Resolve jump fixups
-        std::cout << "Resolving jump fixups...\n";
+        // Pass 2 -
+        std::cout << "Running pass 2...\n";
         for (const JumpFixup &fixup : jumpFixups)
         {
             const Symbol *label = symbolTable.getSymbol(fixup.target);

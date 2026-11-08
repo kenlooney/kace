@@ -40,7 +40,19 @@ public:
         ops_table.addto_alias(")", "}");
 
         // "jmp" already has an alias in the KeywordTable, but we can add more if needed.
-        keywords_table.add_alias("jmp", {"jump", "goto"});
+        keywords_table.addto_alias("jmp", "jump");
+        keywords_table.addto_alias("mov", "move");
+        keywords_table.addto_alias("mov", "copy");
+         
+        
+        // Keyword directives
+        keywords_table.addto_alias("times", "fill");
+        keywords_table.addto_alias("times", "repeat");
+        keywords_table.addto_alias("times", "dup");
+        keywords_table.addto_alias("db", "definebyte");
+        keywords_table.addto_alias("db", "byte");
+        keywords_table.addto_alias("dw", "defineword");
+        keywords_table.addto_alias("dw", "word");
     }
 
     bool parse(
@@ -110,6 +122,33 @@ public:
             std::size_t operand_start = 1;
             std::size_t operand_end = tokens.size();
 
+            if (statement.name == "times")
+            {
+                statement.kind = StatementKind::Times;
+                if (tokens.size() < 4 || tokens[1].kind != "integer" ||
+                    tokens[2].text != "db")
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Expected times count db expression";
+                    return false;
+                }
+                if (!parse_integer(tokens[1].text, statement.count))
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Invalid repeat count";
+                    return false;
+                }
+                if (statement.count > 1000000)
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Repeat count exceeds the limit";
+                    return false;
+                }
+                statement.type = DataType::Byte;
+                operand_start = 3;
+            }
+          
+          
             if (statement.name == "mov")
             {
                 // move/copy/mov <expression> into <register>
