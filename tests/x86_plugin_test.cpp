@@ -54,6 +54,40 @@ int main() {
             return 1;
         }
     }
+    {
+        std::vector<std::uint8_t> encoded;
+        std::size_t position = 0;
+        std::string decoded;
+        if (!cpu.encode_far_jump(0x1234, 0x5678, encoded, error) ||
+            encoded != std::vector<std::uint8_t>{0xEA, 0x78, 0x56, 0x34, 0x12} ||
+            !cpu.decode(encoded, position, decoded) || position != 5 ||
+            decoded != "jmp far 4660:22136") {
+            std::cerr << "Far jump encoding or decoding failed\n";
+            return 1;
+        }
+        for (std::size_t length = 0; length < encoded.size(); ++length) {
+            const std::vector<std::uint8_t> truncated(encoded.begin(), encoded.begin() + length);
+            position = 0;
+            if (cpu.decode(truncated, position, decoded) || position != 0) {
+                std::cerr << "Truncated far jump was accepted\n";
+                return 1;
+            }
+        }
+        std::vector<std::uint8_t> invalid;
+        if (cpu.encode_far_jump(0x10000, 0, invalid, error) ||
+            cpu.encode_far_jump(0, 0x10000, invalid, error)) {
+            std::cerr << "Out-of-range far jump was accepted\n";
+            return 1;
+        }
+        x86.setMode(X86Mode::Bits32);
+        position = 0;
+        if (cpu.encode_far_jump(0, 0, invalid, error) ||
+            cpu.decode(encoded, position, decoded) || position != 0) {
+            std::cerr << "Far jump accepted in unsupported mode\n";
+            return 1;
+        }
+        x86.setMode(X86Mode::Bits16);
+    }
     const std::vector<std::uint8_t> instructions{0xEB, 0x01, 0x90, 0xEB, 0xFB, 0xB0, 42};
     std::size_t offset = 0;
     std::string text;

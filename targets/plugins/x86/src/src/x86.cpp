@@ -18,9 +18,8 @@
 // Encoding
 bool X86::encode_short_jump(
     std::int64_t displacement,
-    std::vector<std::uint8_t>& bytes,
-    std::string& error
-) const
+    std::vector<std::uint8_t> &bytes,
+    std::string &error) const
 {
     if (displacement < -128 || displacement > 127)
     {
@@ -64,9 +63,8 @@ bool X86::encode_immediate(
 }
 bool X86::encode_near_jump(
     std::int64_t displacement,
-    std::vector<std::uint8_t>& bytes,
-    std::string& error
-) const
+    std::vector<std::uint8_t> &bytes,
+    std::string &error) const
 {
     if (displacement < -32768 || displacement > 32767)
     {
@@ -74,13 +72,13 @@ bool X86::encode_near_jump(
         return false;
     }
     const auto value = static_cast<std::uint16_t>(displacement);
-    bytes.push_back(0xE9); // Near jump opcode
+    bytes.push_back(0xE9);                                  // Near jump opcode
     bytes.push_back(static_cast<std::uint8_t>(value));      // Low byte
     bytes.push_back(static_cast<std::uint8_t>(value >> 8)); // High byte
     return true;
 }
-bool X86::near_jump_displacement(const std::vector<std::uint8_t>& bytes, std::size_t offset,
-                                 std::int64_t& displacement) const
+bool X86::near_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
+                                 std::int64_t &displacement) const
 {
     if (offset >= bytes.size() || bytes.size() - offset < 3 || bytes[offset] != 0xE9)
         return false;
@@ -89,16 +87,44 @@ bool X86::near_jump_displacement(const std::vector<std::uint8_t>& bytes, std::si
     return true;
 }
 
+bool X86::encode_far_jump(
+    std::uint64_t segment,
+    std::uint64_t offset,
+    std::vector<std::uint8_t> &bytes,
+    std::string &error) const
+{
+    // Far jump encoding is only supported in 16-bit mode
+    if (mode != X86Mode::Bits16)
+    {
+        error = "far jump encoding is only supported in 16-bit mode";
+        return false;
+    }
+    if (segment > 0xFFFF || offset > 0xFFFF)
+    {
+        error = "far jump segment and offset must fit in 16 bits";
+        return false;
+    }
+
+    bytes = {
+        0xEA,
+        static_cast<std::uint8_t>(offset),
+        static_cast<std::uint8_t>(offset >> 8),
+        static_cast<std::uint8_t>(segment),
+        static_cast<std::uint8_t>(segment >> 8)};
+    return true;
+}
+
 // Decoding
 bool X86::decode(
-    const std::vector<std::uint8_t>& bytes,
-    std::size_t& offset,
-    std::string& text
-) const {
+    const std::vector<std::uint8_t> &bytes,
+    std::size_t &offset,
+    std::string &text) const
+{
     if (offset >= bytes.size())
         return false;
 
-    switch (bytes[offset]) {
+    switch (bytes[offset])
+    {
     case 0x90:
         return decode_no_operand(bytes, offset, text);
     case 0xB0:
@@ -107,11 +133,14 @@ bool X86::decode(
         return decode_short_jump(bytes, offset, text);
     case 0xE9:
         return decode_near_jump(bytes, offset, text);
+    case 0xEA:
+        return decode_far_jump(bytes, offset, text);
+
     default:
         return false;
     }
 }
-bool X86::decode_no_operand(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const
+bool X86::decode_no_operand(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
     if (offset >= bytes.size())
         return false;
@@ -126,7 +155,7 @@ bool X86::decode_no_operand(const std::vector<std::uint8_t>& bytes, std::size_t&
     return false;
 }
 
-bool X86::decode_immediate(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const
+bool X86::decode_immediate(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
     if (offset + 1 >= bytes.size())
         return false;
@@ -141,7 +170,7 @@ bool X86::decode_immediate(const std::vector<std::uint8_t>& bytes, std::size_t& 
 
     return false;
 }
-bool X86::decode_short_jump(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const
+bool X86::decode_short_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
     std::int64_t displacement = 0;
     if (!short_jump_displacement(bytes, offset, displacement))
@@ -151,8 +180,8 @@ bool X86::decode_short_jump(const std::vector<std::uint8_t>& bytes, std::size_t&
     return true;
 }
 
-bool X86::short_jump_displacement(const std::vector<std::uint8_t>& bytes, std::size_t offset,
-                                  std::int64_t& displacement) const
+bool X86::short_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
+                                  std::int64_t &displacement) const
 {
     if (offset >= bytes.size() || bytes.size() - offset < 2 || bytes[offset] != 0xEB)
         return false;
@@ -160,7 +189,7 @@ bool X86::short_jump_displacement(const std::vector<std::uint8_t>& bytes, std::s
     displacement = value < 128 ? value : static_cast<int>(value) - 256;
     return true;
 }
-bool X86::decode_near_jump(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const
+bool X86::decode_near_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
     const auto value = bytes[offset + 1] | (bytes[offset + 2] << 8);
 
@@ -172,6 +201,17 @@ bool X86::decode_near_jump(const std::vector<std::uint8_t>& bytes, std::size_t& 
     text = "jmp " + std::to_string(displacement);
     return true;
 }
-
-
-
+bool X86::decode_far_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+{
+    if(mode != X86Mode::Bits16 || offset >= bytes.size() || bytes.size() - offset < 5)
+        return false;
+    if (bytes[offset] == 0xEA)
+    {
+        std::uint16_t offset_value = bytes[offset + 1] | (bytes[offset + 2] << 8);
+        std::uint16_t segment_value = bytes[offset + 3] | (bytes[offset + 4] << 8);
+        offset += 5;
+        text = "jmp far " + std::to_string(segment_value) + ":" + std::to_string(offset_value);
+        return true;
+    }
+    return false;
+}

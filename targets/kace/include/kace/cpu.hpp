@@ -53,6 +53,16 @@ public:
         return false;
     }
 
+    virtual bool encode_far_jump(
+        std::uint64_t segment,
+        std::uint64_t offset,
+        std::vector<std::uint8_t> &bytes,
+        std::string &error) const
+    {
+        error = "far jump encoding is not supported by this CPU";
+        return false;
+    }
+
 
     // Decoding
     virtual bool decode(
@@ -91,4 +101,11 @@ public:
     {
         return false;
     }
+
+    virtual bool decode_far_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+    {
+        text = "far jump decoding is not supported by this CPU";
+        return false;
+    }
+ 
 };
