@@ -42,6 +42,7 @@ assembly concepts.
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
 - Label recognition, offset recording, and short- and near-jump fixups, plus a symbol
   table with save/load helpers
+- Parsing of far-jump segment and offset literals
 - Extensible keyword and operator alias tables
 - CTest-based automated tests
 
@@ -88,7 +89,12 @@ reported as errors.
 KASM also accepts `jmp near label` (and its `jump` and `goto` aliases). The
 x86 plugin's current near form uses the 16-bit `E9` encoding: a three-byte
 instruction with a signed 16-bit displacement, from -32768 through 32767,
-relative to the end of the instruction. Far jumps are not yet supported.
+relative to the end of the instruction.
+
+The parser also accepts a far jump such as `jmp far 0x1234:0x5678`, with
+integer literals for the segment and offset. The `jump` and `goto` aliases
+work here too. Far-jump encoding and disassembly are not yet implemented, so
+this form cannot currently be assembled to a binary.
 Each successful assembly writes a `.sym` symbol file next to the output binary,
 using the same filename with its extension replaced (for example,
 `example.bin` and `example.sym`). Keep these files together.
@@ -129,9 +135,8 @@ This writes `example.dism` next to the input and automatically reads
 `example.sym` if present. To choose a different output name or directory,
 pass `-o`; its extension is replaced with `.dism`. Without a matching symbol
 file, jumps show numeric relative displacements and are not directly
-reassemblable. Named target restoration currently applies to short jumps;
-near jumps are displayed with a numeric displacement even when symbols are
-available. Keep the symbol file paired with its binary: KASM does not
+reassemblable. With matching symbols, named targets are restored for short
+and 16-bit near jumps. Keep the symbol file paired with its binary: KASM does not
 verify that they match. Unknown or incomplete instructions stop decoding with
 an error and do not replace an existing output file.
 
@@ -163,7 +168,7 @@ ctest --test-dir build --output-on-failure -C Debug
 
 The test suite covers source loading, diagnostics, lexing, expression and
 statement parsing, CLI output, CPU plugins, x86 encoding and decoding, and
-symbol table persistence. The CLI tests also cover short-jump assembly and
+symbol table persistence. The CLI tests also cover short- and near-jump assembly and
 disassembly, including failure cases. Use CTest's `-V` option to show output
 from passing tests, or select a test in CMake Tools' Test Explorer.
 
@@ -184,7 +189,7 @@ examples/     Example assembly source files
 Planned development includes:
 
 - Output for word, double-word, and quad-word data definitions
-- Far jumps, near-jump target restoration during disassembly, and broader label resolution
+- Far-jump encoding and disassembly, and broader label resolution
 - CPU mode selection and mode-aware encoding
 - Connecting immediate encoding to the CLI and expanding disassembly
 - More instructions, registers, and addressing modes

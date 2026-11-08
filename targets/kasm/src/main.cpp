@@ -316,7 +316,12 @@ int main(int argc, char *argv[])
                     decoded << name << ":\n";
             std::int64_t displacement = 0;
             std::string text = instruction.text;
+            const char* jumpType = nullptr;
             if (loader.cpu()->short_jump_displacement(bytes, instruction.offset, displacement))
+                jumpType = "short";
+            else if (loader.cpu()->near_jump_displacement(bytes, instruction.offset, displacement))
+                jumpType = "near";
+            if (jumpType != nullptr)
             {
                 std::size_t target = instruction.end;
                 bool valid = true;
@@ -334,10 +339,12 @@ int main(int argc, char *argv[])
                     target += static_cast<std::size_t>(displacement);
                 const auto found = valid ? labels.find(target) : labels.end();
                 if (found != labels.end())
-                    text = "jmp short " + found->second.front();
+                    text = std::string("jmp ") + jumpType + " " + found->second.front();
             }
+
             decoded << text << '\n';
         }
+        
         const auto endLabels = labels.find(bytes.size());
         if (endLabels != labels.end())
             for (const auto &name : endLabels->second)
