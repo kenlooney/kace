@@ -44,6 +44,13 @@ class X86 : public Cpu {
         std::string& error
     ) const override;
 
+    bool encode_far_jump(
+        std::uint64_t segment,
+        std::uint64_t offset,
+        std::vector<std::uint8_t>& bytes,
+        std::string& error
+    ) const override;
+
     // Decoding
     bool decode(
         const std::vector<std::uint8_t>& bytes,
@@ -56,6 +63,8 @@ class X86 : public Cpu {
                                  std::int64_t& displacement) const override;
     bool decode_immediate(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
     bool decode_near_jump(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
+    bool decode_far_jump(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
+
     bool near_jump_displacement(const std::vector<std::uint8_t>& bytes, std::size_t offset,
                                 std::int64_t& displacement) const override;
    

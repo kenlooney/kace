@@ -425,6 +425,17 @@ int main(int argc, char *argv[])
                 bytes.push_back(0); // Extra byte for the near jump offset
                 continue;
             }
+            if (statement.kind == StatementKind::JumpFar)
+            {
+                std::vector<std::uint8_t> encoded;
+                if (!loader.cpu()->encode_far_jump(statement.farSegment, statement.farOffset, encoded, error))
+                {
+                    std::cerr << commandLine.input << ":" << statement.line << ": " << error << "\n";
+                    return 1;
+                }
+                bytes.insert(bytes.end(), encoded.begin(), encoded.end());
+                continue;
+            }
             std::uint8_t byte = 0;
             if (!encode_statement(statement, *loader.cpu(), byte, error))
             {
