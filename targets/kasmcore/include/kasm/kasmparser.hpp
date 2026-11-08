@@ -16,6 +16,7 @@
 #pragma once
 #include <kasm/kasmlexer.hpp>
 #include <kace/parser.hpp>
+#include <kace/integers.hpp>
 #include <sstream>
 #include <vector>
 // For testing purposes
@@ -139,7 +140,7 @@ public:
             }
             if (statement.name == "jmp")
             {
-                if (tokens.size() != 3 || tokens[2].kind != "identifier")
+                if (tokens.size() < 2)
                 {
                     error = source.name + ":" +
                             std::to_string(line_number) +
@@ -147,17 +148,36 @@ public:
                     return false;
                 }
                 const std::string &type = tokens[1].text;
+                if (type == "far")
+                {
+                    if (tokens.size() != 5 || tokens[2].kind != "integer" ||
+                        tokens[3].text != ":" || tokens[4].kind != "integer" ||
+                        !parse_integer(tokens[2].text, statement.farSegment) ||
+                        !parse_integer(tokens[4].text, statement.farOffset))
+                    {
+                        error = source.name + ":" + std::to_string(line_number) +
+                                ": Expected a far jump segment:offset";
+                        return false;
+                    }
+                    statement.kind = StatementKind::JumpFar;
+                    statements.push_back(statement);
+                    continue;
+                }
+                if (tokens.size() != 3 || tokens[2].kind != "identifier")
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Expected a jump type and target label";
+                    return false;
+                }
                 if (type == "short")
                     statement.kind = StatementKind::JumpShort;
                 else if (type == "near")
                     statement.kind = StatementKind::JumpNear;
-                // else if (type == "far")
-                //     statement.kind = StatementKind::JumpFar;
                 else
                 {
                     error = source.name + ":" +
                             std::to_string(line_number) +
-                            ": Expected a jump type of short or near (far jumps are not supported)";
+                            ": Expected a jump type of short, near, or far";
                     return false;
                 }
                 statement.target = tokens[2].text;

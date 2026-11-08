@@ -109,12 +109,12 @@
             <code>copy</code> and <code>move</code> as an alias for <code>mov</code> and <code>define</code> to define byte widths. Instead of using <code>db</code>, which is ambiguous, the language opts for more descriptive constructs. Is <code>db</code> supposed to mean <i>drop byte</i> or <i>define byte</i>? it has no meaning! It’s about making the code more understandable and meaningful for the user.</p>
           <p>KASM can resolve short and 16-bit near jumps to labels before or after an instruction. Use
             <code>jmp short</code> or <code>jmp near</code>; <code>jump</code> and <code>goto</code> are aliases
-            for <code>jmp</code>. Far jumps are still in development.
+            for <code>jmp</code>. The parser also accepts far jumps such as
+            <code>jmp far 0x1234:0x5678</code>; far-jump encoding and disassembly are still in development.
           </p>
           <p>The KASM CLI can also disassemble supported x86 instructions into a <code>.dism</code> file.
             Assembly saves labels in a matching <code>.sym</code> file, which the disassembler can use to restore
-            short-jump targets. Near jumps currently show their relative displacement even with symbols; without
-            the symbol file, short jumps do too.
+            short- and near-jump targets. Without the symbol file, jumps show their relative displacement.
             Disassembly uses standard instruction names like <code>jmp</code>, even when the source used
             an alias such as <code>jump</code> or <code>goto</code>.
           </p><a class="inline-link" href="#download">EXPLORE RELEASES <span>↗</span></a>

@@ -44,7 +44,14 @@ int main() {
         std::cerr << "Near jump did not parse correctly\n";
         return 1;
     }
-    for (const std::string& invalid : {"jmp short", "jmp short 42", "jmp short done extra", "jmp wide done", "jmp far done"}) {
+    source.text = "jmp far 0x1234:0b1010";
+    if (!parser.parse(source, statements, error) || statements.size() != 1 ||
+        statements[0].kind != StatementKind::JumpFar ||
+        statements[0].farSegment != 0x1234 || statements[0].farOffset != 10) {
+        std::cerr << "Far jump did not parse correctly: " << error << '\n';
+        return 1;
+    }
+    for (const std::string& invalid : {"jmp short", "jmp short 42", "jmp short done extra", "jmp wide done", "jmp far done", "jmp far 1:", "jmp far 1:0x", "jmp far 1:2 extra"}) {
         source.text = invalid;
         if (parser.parse(source, statements, error)) {
             std::cerr << "Invalid jump accepted: " << invalid << '\n';

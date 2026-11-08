@@ -32,6 +32,8 @@ struct Statement {
     std::size_t offset = 0;
     StatementKind kind = StatementKind::Instruction;
     std::string target; // For jump statements, the label or address to jump to
+    std::uint64_t farSegment = 0;
+    std::uint64_t farOffset = 0;
 };
 
 bool parse_statement(const std::vector<Token>& tokens, Statement& statement, std::string& error);
