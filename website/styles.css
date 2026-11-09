@@ -27,3 +27,12 @@
 .plugin-guide li { padding: 0 0 10px 7px; }
 .plugin-guide p:last-child { margin: 10px 0 0; }
 @media (max-width: 850px) { .plugins-grid { grid-template-columns: 1fr; gap: 40px; } }
+
+/* Directive reference */
+.directives { background: #e1e8d8; color: var(--ink); }
+.directive-list { border-top: 1px solid #9dab99; }
+.directive-list article { display: grid; grid-template-columns: 1fr 1.4fr; gap: 40px; padding: 25px 0; border-bottom: 1px solid #aab7a4; }
+.directive-list h3 { margin: 0 0 10px; font-size: 21px; font-weight: 500; }
+.directive-list p { margin: 0; max-width: 650px; color: #52665a; font-size: 14px; line-height: 1.8; }
+.directive-list code { font-family: var(--mono); font-size: .9em; overflow-wrap: anywhere; }
+@media (max-width: 850px) { .directive-list article { grid-template-columns: 1fr; gap: 14px; } }

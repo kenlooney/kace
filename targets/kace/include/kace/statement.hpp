@@ -16,7 +16,8 @@ enum class DataType {
 };
 enum class DirectiveKind {
     None,
-    Include
+    Include,
+    AssertPosition
 };
 enum class StatementKind {
     Label,
@@ -26,7 +27,8 @@ enum class StatementKind {
     JumpNear,
     JumpFar,
     Times,
-    Include,
+
+
 };
 
 enum class DirectiveStage {
@@ -51,6 +53,7 @@ struct Statement {
     DirectiveKind directiveKind = DirectiveKind::None; // The kind of directive, if this statement is a directive
     std::string includePath; // For include directive, the path of the included file
     DirectiveStage directiveStage = DirectiveStage::SourceExpansion; // The stage at which the directive is processed
+    std::uint64_t assertPosition = 0; // For assert position directive, the expected position
 };
 
 bool parse_statement(const std::vector<Token>& tokens, Statement& statement, std::string& error);

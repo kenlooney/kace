@@ -39,6 +39,7 @@ assembly concepts.
 - Byte-range semantic validation and raw binary output for byte definitions
 - Repeated byte definitions and position-based padding with `times`, `fill`, `repeat`, or `dup`
 - Source-file inclusion with nested includes and cycle detection
+- Assembly-time output-position assertions with `#assertposition`
 - A CPU plugin interface with default unsupported-operation implementations,
   and an x86 plugin that encodes `nop`, short jumps, and 16-bit near and far jumps
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
@@ -69,6 +70,21 @@ From a Windows Debug build, assemble it with:
 The output is the raw byte sequence `90 05 07 90`. The CPU defaults to
 `x86`; use `-c` or `--cpu` to select a plugin. Run `kasm --help` for CLI
 options. The plugin and shared libraries must be next to the executable.
+
+## Supported directives
+
+| Directive | Purpose | When handled |
+|-----------|---------|--------------|
+| `byte`, `definebyte`, `db` | Emit one byte from an expression. | Assembly |
+| `times`, `fill`, `repeat`, `dup` | Repeat a byte definition using a count expression. | Assembly |
+| `#include` | Insert statements from another source file. | Source expansion |
+| `#assertposition` | Check the current output offset without emitting bytes. | Assembly |
+
+### Byte definitions
+
+Use `byte`, `definebyte`, or `db` followed by an expression to emit one byte;
+the evaluated value must be between 0 and 255. The older `define byte` form
+is also currently accepted.
 
 ### Repeating bytes and padding
 
@@ -118,6 +134,27 @@ Included statements share the same output and label table as the main source.
 Missing files, include cycles, and nesting deeper than 128 active source files
 (including the main file) produce errors. The same file can be included again
 after a previous inclusion has finished.
+
+### Checking the output position
+
+Use `#assertposition` followed by a single nonnegative integer literal to
+check the current byte offset during assembly:
+
+```asm
+byte 1
+byte 2
+#assertposition 2
+byte 3
+```
+
+The assertion emits no bytes; this example produces `01 02 03`. If the
+current offset differs from the expected position, assembly stops with an
+error showing both values. The position is measured from the beginning of
+the output, including bytes emitted by included files. Decimal and other
+supported integer literal forms can be used; expressions are not yet accepted
+for this directive.
+
+## Jumps and disassembly
 
 Labels on their own lines are recorded while output is generated. A short
 jump can refer to a label before or after the jump:
@@ -222,7 +259,7 @@ ctest --test-dir build --output-on-failure -C Debug
 The test suite covers source loading, diagnostics, lexing, expression and
 statement parsing, CLI output, CPU plugins, x86 encoding and decoding, and
 symbol table persistence. The CLI tests also cover jumps, position-based
-padding, and nested includes, including failure cases. Use CTest's `-V` option to show output
+padding, nested includes, and position assertions, including failure cases. Use CTest's `-V` option to show output
 from passing tests, or select a test in CMake Tools' Test Explorer.
 
 ## Repository Layout

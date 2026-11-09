@@ -104,6 +104,13 @@ add_test(
           -P ${CMAKE_CURRENT_SOURCE_DIR}/kasm_include_cli_test.cmake
 )
 add_test(
+  NAME kasm_assertposition_cli_test
+  COMMAND ${CMAKE_COMMAND}
+          -DKASM=$<TARGET_FILE:kasm>
+          -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/assertposition_test
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/kasm_assertposition_cli_test.cmake
+)
+add_test(
   NAME kasm_disassemble_cli_test
   COMMAND ${CMAKE_COMMAND}
           -DKASM=$<TARGET_FILE:kasm>

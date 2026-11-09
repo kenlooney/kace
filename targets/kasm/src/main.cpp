@@ -248,6 +248,8 @@ bool expandIncludes(const Source &source, std::vector<Statement> &statements,
     active.pop_back();
     return true;
 }
+
+ 
 int main(int argc, char *argv[])
 {
     const auto commandLine = parseCommandLine(argc, argv);
@@ -448,7 +450,19 @@ int main(int argc, char *argv[])
         for (Statement &statement : statements)
         {
             statement.offset = bytes.size();
-
+            if (
+                statement.kind == StatementKind::Directive && 
+                statement.directiveStage == DirectiveStage::Assembly &&
+                statement.directiveKind == DirectiveKind::AssertPosition
+            )
+            {
+                if(statement.offset != statement.assertPosition)
+                {
+                    std::cerr << statement.sourceName << ":" << statement.line << ": Assert position failed: expected " << statement.assertPosition << ", got " << statement.offset << "\n";
+                    return 1;
+                }
+                continue;
+            }
             if (statement.kind == StatementKind::Label)
             {
                 if (!symbolTable.addLabel(statement.name, statement.offset))
