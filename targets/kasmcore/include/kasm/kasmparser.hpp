@@ -104,7 +104,8 @@ public:
                 }
                 statement.name = "include";
                 statement.directiveKind = DirectiveKind::Include;
-
+                statement.directiveStage = DirectiveStage::SourceExpansion;
+                
                 if(tokens.size() != 3) // If token count is not exactly 3, it's an error because the path is not included
                 {
                     error = source.name + ":" + std::to_string(line_number) +
@@ -120,6 +121,7 @@ public:
 
                 std::string include_path = tokens[2].text;
                 statement.includePath = include_path;
+                
                 statements.push_back(statement);
                 continue;
             }

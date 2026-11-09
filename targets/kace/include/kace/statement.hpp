@@ -28,6 +28,11 @@ enum class StatementKind {
     Times,
     Include,
 };
+
+enum class DirectiveStage {
+    SourceExpansion,
+    Assembly
+};
 struct Statement {
     std::string name;
     std::string sourceName;
@@ -45,6 +50,7 @@ struct Statement {
     Expression countExpression; // For times directive, the expression representing the repeat count
     DirectiveKind directiveKind = DirectiveKind::None; // The kind of directive, if this statement is a directive
     std::string includePath; // For include directive, the path of the included file
+    DirectiveStage directiveStage = DirectiveStage::SourceExpansion; // The stage at which the directive is processed
 };
 
 bool parse_statement(const std::vector<Token>& tokens, Statement& statement, std::string& error);
