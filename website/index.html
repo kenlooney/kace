@@ -16,7 +16,7 @@
     <a class="brand" href="#top" aria-label="KACE home"><span
         class="brand-mark">K<span>.</span></span><span>KACE<small>ASSEMBLY &amp; COMPILER ENVIRONMENT</small></span></a>
     <nav aria-label="Main navigation"><a href="#about">The project</a><a href="#kasm">Meet KASM</a><a
-        href="#plugins">Plugins</a><a href="#creator">The creator</a></nav>
+        href="#directives">Directives</a><a href="#plugins">Plugins</a><a href="#creator">The creator</a></nav>
     <a class="header-link" href="#download">Get KACE <span aria-hidden="true">↗</span></a>
   </header>
   <main>
@@ -140,6 +140,30 @@
         </div>
       </div>
     </section>
+    <section class="directives section" id="directives">
+      <div class="wrap">
+        <div class="section-heading">
+          <div><p class="section-number">KASM / REFERENCE</p><h2>Meet the <em>directives.</em></h2></div>
+          <p>Directives describe data and guide assembly. Here's what KASM supports today.</p>
+        </div>
+        <div class="directive-list">
+          <article><div><h3>Define a byte</h3><code>byte 42</code></div><p>Emit one byte from an expression. <code>definebyte</code> and <code>db</code> are aliases; the value must fit in a byte.</p></article>
+          <article><div><h3>Repeat and pad</h3><code>fill 4 byte 0</code></div><p><code>times</code>, <code>repeat</code>, and <code>dup</code> also repeat bytes. Counts may use <code>currentposition</code> and <code>sectionstart</code> to pad to an offset. Repetition is limited to one million bytes per directive.</p></article>
+          <article><div><h3>Include a file</h3><code>#include "data/extra.asm"</code></div><p>Insert another source file during source expansion. Nested includes share the program's labels and output; relative paths start from the including file, and cycles are rejected.</p></article>
+          <article>
+            <div><h3>Check a position</h3><code>#assertposition 2</code></div>
+            <div>
+              <p>During assembly, check that the output is at the specified byte offset. The argument is an integer literal; the directive emits no bytes and reports an error if the position differs.</p>
+              <pre class="directive-example"><code>byte 1
+byte 2
+#assertposition 2  ; passes after two bytes
+byte 3</code></pre>
+              <p>The output is <code>01 02 03</code>; the assertion adds no bytes.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
     <section class="plugins section" id="plugins">
       <div class="wrap">
         <div class="section-heading">
@@ -149,6 +173,20 @@
           </div>
           <p>CPU plugins give KASM a way to work with different architectures. Select a plugin by name when assembling,
             or build one for a new CPU.</p>
+        </div>
+        <div class="plugin-architecture">
+          <div>
+            <p class="plugin-label">HOW IT FITS TOGETHER</p>
+            <h3>One CLI. Different machines.</h3>
+            <p>KASM reads your source and hands its statements to the selected plugin's assembler. The plugin
+              handles its own instruction encoding and jump fixups. For disassembly, the CLI hands the bytes
+              and any symbols to the plugin's disassembler.</p>
+          </div>
+          <div class="plugin-flow" aria-label="KASM sends statements to a CPU plugin assembler and bytes to its disassembler">
+            <div><span>SOURCE</span><strong>KASM</strong><span>STATEMENTS →</span><strong>Assembler</strong><span>→ BYTES</span></div>
+            <div><span>BINARY</span><strong>KASM</strong><span>BYTES →</span><strong>Disassembler</strong><span>→ TEXT</span></div>
+            <small>Assembler and disassembler are provided by the selected CPU plugin.</small>
+          </div>
         </div>
         <div class="plugins-grid">
           <div>
@@ -169,14 +207,14 @@
             <p class="plugin-label">ADDING A CPU PLUGIN</p>
             <h3>Bring another architecture.</h3>
             <ol>
-              <li>Override the KACE <code>Cpu</code> operations supported by your target architecture; the default implementations report unsupported operations.</li>
+              <li>Provide a <code>Cpu</code> with an <code>Assembler</code> for your architecture and, optionally, a <code>Disassembler</code>.</li>
               <li>Build it as a shared library and export the C factory functions <code>create_cpu</code> and
                 <code>destroy_cpu</code>.</li>
               <li>Place the library next to the KASM executable. Use the platform’s shared-library naming convention,
                 such as <code>x86.dll</code> on Windows or <code>libx86.so</code> on Linux.</li>
               <li>Select it with <code>--cpu=&lt;name&gt;</code> when producing output.</li>
             </ol>
-            <p>The plugin interface and supported instructions are still evolving.</p>
+            <p>The plugin interface and shared statement model are still evolving; plugins must be built against the matching KACE interface.</p>
           </div>
         </div>
       </div>

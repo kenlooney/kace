@@ -19,6 +19,7 @@
 #include <kace/integers.hpp>
 #include <sstream>
 #include <vector>
+#include <cstddef>
 // For testing purposes
 #include <iostream>
 
@@ -95,31 +96,69 @@ public:
                 statement.kind = StatementKind::Directive;
                 std::string directive = statement.name = tokens[1].text;
 
-                if (tokens[1].kind != "identifier" || directive != "include")
+                if (tokens[1].kind != "identifier" ||
+                    (directive != "include" &&
+                     directive != "assertposition"))
                 {
                     error = source.name + ":" +
                             std::to_string(line_number) +
                             ": Unknown directive " + directive;
                     return false;
                 }
-                statement.name = "include";
-                statement.directiveKind = DirectiveKind::Include;
 
-                if(tokens.size() != 3) // If token count is not exactly 3, it's an error because the path is not included
+                if (directive == "include")
                 {
-                    error = source.name + ":" + std::to_string(line_number) +
-                            ": Expected an include path after #include";
-                    return false;
+                    statement.name = "include";
+                    statement.directiveKind = DirectiveKind::Include;
+                    statement.directiveStage = DirectiveStage::SourceExpansion;
+
+                    if (tokens.size() != 3) // If token count is not exactly 3, it's an error because the path is not included
+                    {
+                        error = source.name + ":" + std::to_string(line_number) +
+                                ": Expected an include path after #include";
+                        return false;
+                    }
+                    if (tokens[2].kind != "string" || tokens[2].text.empty())
+                    {
+                        error = source.name + ":" + std::to_string(line_number) +
+                                ": Include path must be quoted and not empty";
+                        return false;
+                    }
+
+                    std::string include_path = tokens[2].text;
+                    statement.includePath = include_path;
                 }
-                if(tokens[2].kind != "string" || tokens[2].text.empty())
+                else if (directive == "assertposition")
                 {
-                    error = source.name + ":" + std::to_string(line_number) +
-                            ": Include path must be quoted and not empty";
-                    return false;
+                    if (tokens.size() != 3) // If token count is not exactly 3, it's an error because the position is not included
+                    {
+                        error = source.name + ":" + std::to_string(line_number) +
+                                ": Expected a position after #assertposition";
+                        return false;
+                    }
+                    if (tokens[2].kind != "integer" || tokens[2].text.empty())
+                    {
+                        error = source.name + ":" + std::to_string(line_number) +
+                                ": Position must be a number and not empty";
+                        return false;
+                    }
+
+                   
+                    statement.name = "assertposition";
+                    statement.directiveKind = DirectiveKind::AssertPosition;
+                    statement.directiveStage = DirectiveStage::Assembly;
+                     
+                    std::uint64_t position;
+                    if (!parse_integer(tokens[2].text, position))
+                    {
+                        error = source.name + ":" + std::to_string(line_number) +
+                                ": Invalid position";
+                        return false;
+                    }
+                    statement.assertPosition = position;
+
                 }
 
-                std::string include_path = tokens[2].text;
-                statement.includePath = include_path;
                 statements.push_back(statement);
                 continue;
             }
