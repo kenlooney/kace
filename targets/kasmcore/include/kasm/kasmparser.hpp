@@ -41,6 +41,8 @@ public:
 
         // "jmp" already has an alias in the KeywordTable, but we can add more if needed.
         keywords_table.addto_alias("jmp", "jump");
+        keywords_table.addto_alias("jmp", "goto");
+
         keywords_table.addto_alias("mov", "move");
         keywords_table.addto_alias("mov", "copy");
 
@@ -79,6 +81,48 @@ public:
 
             Statement statement;
             statement.line = line_number;
+            statement.sourceName = source.name;
+
+            // Check for directives before identifiers
+            if (tokens[0].kind == "directive")
+            {
+                if (tokens.size() < 2)
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Expected a directive name after #";
+                    return false;
+                }
+                statement.kind = StatementKind::Directive;
+                std::string directive = statement.name = tokens[1].text;
+
+                if (tokens[1].kind != "identifier" || directive != "include")
+                {
+                    error = source.name + ":" +
+                            std::to_string(line_number) +
+                            ": Unknown directive " + directive;
+                    return false;
+                }
+                statement.name = "include";
+                statement.directiveKind = DirectiveKind::Include;
+
+                if(tokens.size() != 3) // If token count is not exactly 3, it's an error because the path is not included
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Expected an include path after #include";
+                    return false;
+                }
+                if(tokens[2].kind != "string" || tokens[2].text.empty())
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Include path must be quoted and not empty";
+                    return false;
+                }
+
+                std::string include_path = tokens[2].text;
+                statement.includePath = include_path;
+                statements.push_back(statement);
+                continue;
+            }
 
             // Check for labels before identifiers
             if (tokens[0].kind == "label")
@@ -125,7 +169,7 @@ public:
 
             if (statement.name == "times")
             {
-                
+
                 statement.kind = StatementKind::Times;
                 std::size_t byte_index = 1;
                 std::string data_directive;
