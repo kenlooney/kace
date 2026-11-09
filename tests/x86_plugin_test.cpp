@@ -4,7 +4,81 @@
 #include <iostream>
 #include <utility>
 
+bool test_near_modes() {
+    X86 cpu;
+    for (const X86Mode mode : {X86Mode::Bits16, X86Mode::Bits32, X86Mode::Bits64}) {
+        cpu.setMode(mode);
+        const bool wide = mode != X86Mode::Bits16;
+        const std::int64_t minimum = wide ? -2147483648LL : -32768;
+        const std::int64_t maximum = wide ? 2147483647LL : 32767;
+        const std::vector<std::uint8_t> expected = wide
+            ? std::vector<std::uint8_t>{0xE9, 0xFE, 0xFF, 0xFF, 0xFF}
+            : std::vector<std::uint8_t>{0xE9, 0xFE, 0xFF};
+        for (const auto value : {minimum, std::int64_t{-2}, std::int64_t{0}, maximum}) {
+            std::vector<std::uint8_t> encoded;
+            std::string error, decoded;
+            std::size_t offset = 0;
+            if (!cpu.encoder()->encode_near_jump(value, encoded, error) ||
+                (value == -2 && encoded != expected) ||
+                !cpu.decoder()->decode(encoded, offset, decoded) ||
+                offset != encoded.size() || decoded != "jmp " + std::to_string(value)) {
+                std::cerr << "Near jump mode round trip failed: " << error << '\n';
+                return false;
+            }
+            for (std::size_t size = 0; size < encoded.size(); ++size) {
+                std::vector<std::uint8_t> truncated(encoded.begin(), encoded.begin() + size);
+                offset = 0;
+                if (cpu.decoder()->decode(truncated, offset, decoded) || offset != 0) {
+                    std::cerr << "Truncated near jump accepted\n";
+                    return false;
+                }
+            }
+        }
+        for (const auto value : {minimum - 1, maximum + 1}) {
+            std::vector<std::uint8_t> encoded{0x90};
+            std::string error;
+            if (cpu.encoder()->encode_near_jump(value, encoded, error) ||
+                encoded != std::vector<std::uint8_t>{0x90}) {
+                std::cerr << "Out-of-range near jump accepted or changed output\n";
+                return false;
+            }
+        }
+
+        std::vector<Statement> statements(5);
+        statements[0].kind = StatementKind::Label; statements[0].name = "start";
+        statements[1].kind = StatementKind::JumpNear; statements[1].target = "end";
+        statements[2].name = "nop";
+        statements[3].kind = StatementKind::Label; statements[3].name = "end";
+        statements[4].kind = StatementKind::JumpNear; statements[4].target = "start";
+        std::vector<std::uint8_t> assembled;
+        SymbolTable symbols;
+        std::string error, decoded;
+        const std::vector<std::uint8_t> want = wide
+            ? std::vector<std::uint8_t>{0xE9, 1, 0, 0, 0, 0x90, 0xE9, 0xF5, 0xFF, 0xFF, 0xFF}
+            : std::vector<std::uint8_t>{0xE9, 1, 0, 0x90, 0xE9, 0xF9, 0xFF};
+        if (!cpu.assembler()->assemble(statements, assembled, symbols, error) || assembled != want ||
+            !cpu.disassembler()->disassemble(assembled, symbols, decoded, error) ||
+            decoded != "start:\njmp near end\nnop\nend:\njmp near start\n") {
+            std::cerr << "Mode-aware near jump fixup failed: " << error << '\n';
+            return false;
+        }
+    }
+    cpu.setMode(static_cast<X86Mode>(-1));
+    std::vector<std::uint8_t> encoded{0x90};
+    std::string error, text;
+    std::size_t offset = 0;
+    const std::vector<std::uint8_t> nearJump{0xE9, 0, 0};
+    if (cpu.encoder()->encode_near_jump(0, encoded, error) ||
+        encoded != std::vector<std::uint8_t>{0x90} ||
+        cpu.decoder()->decode(nearJump, offset, text) || offset != 0) {
+        std::cerr << "Invalid mode accepted for near jump\n";
+        return false;
+    }
+    return true;
+}
+
 int main() {
+    if (!test_near_modes()) return 1;
     X86 x86;
     std::uint8_t byte = 0;
 
@@ -52,6 +126,16 @@ int main() {
             std::cerr << "Near jump encoding or decoding failed\n";
             return 1;
         }
+    }
+    {
+        x86.setMode(X86Mode::Bits32);
+        std::vector<std::uint8_t> encoded;
+        if (!x86.encoder()->encode_near_jump(-2, encoded, error) ||
+            encoded != std::vector<std::uint8_t>{0xE9, 0xFE, 0xFF, 0xFF, 0xFF}) {
+            std::cerr << "32-bit near jump encoded incorrectly\n";
+            return 1;
+        }
+        x86.setMode(X86Mode::Bits16);
     }
     {
         std::vector<std::uint8_t> encoded;
