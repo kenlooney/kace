@@ -38,6 +38,7 @@ assembly concepts.
 
 - Byte-range semantic validation and raw binary output for byte definitions
 - Repeated byte definitions and position-based padding with `times`, `fill`, `repeat`, or `dup`
+- Source-file inclusion with nested includes and cycle detection
 - A CPU plugin interface with default unsupported-operation implementations,
   and an x86 plugin that encodes `nop`, short jumps, and 16-bit near and far jumps
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
@@ -98,6 +99,26 @@ The `nop` emits one byte, the `fill` adds nine zero bytes, and the final
 byte brings the total to eleven. If the output is already past the requested
 position, the subtraction reports an error instead of wrapping.
 
+### Including source files
+
+Use `#include` to insert another source file at the directive's position:
+
+```asm
+byte 1
+#include "data/extra.asm"
+byte 4
+```
+
+If `data/extra.asm` contains `byte 2` and `byte 3`, the output is
+`01 02 03 04`. Paths must be non-empty and quoted with single or double
+quotes. Relative paths are resolved from the directory of the file containing
+the directive, so included files can include files of their own.
+
+Included statements share the same output and label table as the main source.
+Missing files, include cycles, and nesting deeper than 128 active source files
+(including the main file) produce errors. The same file can be included again
+after a previous inclusion has finished.
+
 Labels on their own lines are recorded while output is generated. A short
 jump can refer to a label before or after the jump:
 
@@ -109,20 +130,20 @@ done:
 jmp short start
 ```
 
-The jump alias `jump` is also recognized. KASM reserves two
+The jump aliases `jump` and `goto` are also recognized. KASM reserves two
 bytes per short jump, then resolves each target after recording labels. The
 x86 plugin emits `EB` and a signed 8-bit displacement relative to the end of
 the jump. Unknown labels and displacements outside -128 through 127 are
 reported before the output file is opened. Duplicate label definitions are
 reported as errors.
 
-KASM also accepts `jmp near label` (and its `jump` alias). The
+KASM also accepts `jmp near label` (and its `jump` and `goto` aliases). The
 x86 plugin's current near form uses the 16-bit `E9` encoding: a three-byte
 instruction with a signed 16-bit displacement, from -32768 through 32767,
 relative to the end of the instruction.
 
 KASM also assembles far jumps such as `jmp far 0x1234:0x5678`, with integer
-literals for the segment and offset. The `jump` alias works here
+literals for the segment and offset. The `jump` and `goto` aliases work here
 too. In the x86 plugin's default 16-bit mode, both values must fit in 16 bits;
 the example encodes as `EA 78 56 34 12`. Far jumps are disassembled with their
 numeric segment and offset and do not require label fixups. Other modes are
@@ -144,7 +165,7 @@ jmp short start
 
 The symbol file supplies label names and offsets; the raw binary does not store
 them. Disassembly uses canonical instruction names
-such as `jmp`, even when the source used an alias such as `jump`.
+such as `jmp`, even when the source used an alias such as `jump` or `goto`.
 The original spelling is not preserved in the binary.
 
 The CPU interface provides default implementations that report unsupported
@@ -200,8 +221,8 @@ ctest --test-dir build --output-on-failure -C Debug
 
 The test suite covers source loading, diagnostics, lexing, expression and
 statement parsing, CLI output, CPU plugins, x86 encoding and decoding, and
-symbol table persistence. The CLI tests also cover jumps and position-based
-padding, including failure cases. Use CTest's `-V` option to show output
+symbol table persistence. The CLI tests also cover jumps, position-based
+padding, and nested includes, including failure cases. Use CTest's `-V` option to show output
 from passing tests, or select a test in CMake Tools' Test Explorer.
 
 ## Repository Layout

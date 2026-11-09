@@ -14,6 +14,10 @@ enum class DataType {
     Dword,
     Qword
 };
+enum class DirectiveKind {
+    None,
+    Include
+};
 enum class StatementKind {
     Label,
     Instruction,
@@ -22,9 +26,11 @@ enum class StatementKind {
     JumpNear,
     JumpFar,
     Times,
+    Include,
 };
 struct Statement {
     std::string name;
+    std::string sourceName;
     std::size_t line;
     DataType type = DataType::None;
     Expression expression;
@@ -37,6 +43,8 @@ struct Statement {
     std::uint64_t farOffset = 0;
     std::uint64_t count = 0;
     Expression countExpression; // For times directive, the expression representing the repeat count
+    DirectiveKind directiveKind = DirectiveKind::None; // The kind of directive, if this statement is a directive
+    std::string includePath; // For include directive, the path of the included file
 };
 
 bool parse_statement(const std::vector<Token>& tokens, Statement& statement, std::string& error);

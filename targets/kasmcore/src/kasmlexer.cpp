@@ -89,6 +89,23 @@ std::vector<Token> KasmLexer::tokenize(const std::string& input) {
            continue;
        }
 
+       // Handle string literals
+       if(ch == '"' || ch == '\'') {
+           begin = cursor;
+           char quote = input[cursor];
+           ++cursor; // Skip the opening quote
+           while(cursor < input.size() && input[cursor] != quote) {
+               ++cursor;
+           }
+           if(cursor == input.size()) {
+               addToken(Token{"unterminated_string", input.substr(begin + 1), Span{begin, cursor}});
+               continue;
+           }
+           ++cursor; // Skip the closing quote
+           addToken(Token{"string", input.substr(begin + 1, cursor - begin - 2), Span{begin, cursor}});
+           continue;
+       }
+
        // Handle Integer literals
 
        // Binary literals (starting with '0b' or '0B')
@@ -187,6 +204,13 @@ std::vector<Token> KasmLexer::tokenize(const std::string& input) {
             } else {
                 addToken(Token{"dollar", "$", Span{begin, cursor}});
             }
+            continue;
+        }
+        // Handle directives starting with '#'
+        if(ch == '#') {
+            begin = cursor;
+            ++cursor;
+            addToken(Token{"directive", input.substr(begin, cursor - begin), Span{begin, cursor}});
             continue;
         }
 

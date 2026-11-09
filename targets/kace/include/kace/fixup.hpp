@@ -28,4 +28,5 @@ struct JumpFixup {
     std::size_t offset; // Where the jump starts in the output
     std::size_t line;   // For error messages
     JumpKind kind = JumpKind::Short;
+    std::string sourceName;
 };

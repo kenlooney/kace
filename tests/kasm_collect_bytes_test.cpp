@@ -52,6 +52,7 @@ int main(int argc, char *argv[])
 
     std::vector<std::uint8_t> bytes;
     for (const Statement& statement : statements) {
+        if (statement.kind == StatementKind::Label) continue;
         std::uint8_t byte = 0;
         if (!check_byte(statement, byte, error)) {
             std::cerr << error << "\n";
