@@ -40,7 +40,7 @@ assembly concepts.
 - Repeated byte definitions and position-based padding with `times`, `fill`, `repeat`, or `dup`
 - Source-file inclusion with nested includes and cycle detection
 - Assembly-time output-position assertions with `#assertposition`
-- A CPU plugin interface with default unsupported-operation implementations,
+- CPU plugins with assembler and optional disassembler contracts,
   and an x86 plugin that encodes `nop`, short jumps, and 16-bit near and far jumps
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
 - Label recognition, offset recording, and short- and near-jump fixups, plus a symbol
@@ -205,8 +205,9 @@ them. Disassembly uses canonical instruction names
 such as `jmp`, even when the source used an alias such as `jump` or `goto`.
 The original spelling is not preserved in the binary.
 
-The CPU interface provides default implementations that report unsupported
-operations, so plugins can override the encoders and decoder they support.
+The CPU interface exposes a plugin-provided assembler and an optional
+disassembler. The x86 plugin keeps its instruction encoders, decoders, and
+jump fixups inside the plugin. The shared statement model is still evolving.
 The x86 plugin also stores a 16-, 32-, or 64-bit mode, defaulting to 16-bit;
 mode selection is not yet connected to the CLI.
 

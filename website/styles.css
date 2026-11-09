@@ -11,6 +11,14 @@
 .plugins .section-heading h2 em { color: #c7e38b; }
 .plugins .section-heading > p { color: #adbbb0; }
 .plugins-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10%; }
+.plugin-architecture { display: grid; grid-template-columns: 1fr 1.2fr; gap: 10%; align-items: center; margin-bottom: 65px; }
+.plugin-architecture h3 { margin: 0 0 16px; font-size: 25px; font-weight: 500; }
+.plugin-architecture p:not(.plugin-label) { color: #b2c2b5; font-size: 14px; line-height: 1.8; }
+.plugin-flow { padding: 25px; border: 1px solid #53695a; background: #ffffff08; }
+.plugin-flow div { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 0; }
+.plugin-flow span, .plugin-flow small { color: #a0b5a1; font: 10px/1.6 var(--mono); }
+.plugin-flow strong { color: #c7e38b; font: 12px var(--mono); }
+.plugin-flow small { display: block; margin-top: 12px; }
 .plugin-label { margin-bottom: 24px; color: #a0b5a1; font: 10px var(--mono); letter-spacing: .12em; }
 .plugin-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid #53695a; }
 .plugin-list li { padding: 25px 0; border-bottom: 1px solid #53695a; }
@@ -26,7 +34,7 @@
 .plugin-guide ol { padding-left: 20px; margin: 0; }
 .plugin-guide li { padding: 0 0 10px 7px; }
 .plugin-guide p:last-child { margin: 10px 0 0; }
-@media (max-width: 850px) { .plugins-grid { grid-template-columns: 1fr; gap: 40px; } }
+@media (max-width: 850px) { .plugins-grid, .plugin-architecture { grid-template-columns: 1fr; gap: 40px; } }
 
 /* Directive reference */
 .directives { background: #e1e8d8; color: var(--ink); }

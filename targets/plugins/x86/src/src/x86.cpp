@@ -16,7 +16,7 @@
 #include <x86/x86.hpp>
 
 // Encoding
-bool X86::encode_short_jump(
+bool X86Encoder::encode_short_jump(
     std::int64_t displacement,
     std::vector<std::uint8_t> &bytes,
     std::string &error) const
@@ -31,7 +31,7 @@ bool X86::encode_short_jump(
     return true;
 }
 
-bool X86::encode_no_operand(const std::string &name, std::uint8_t &byte) const
+bool X86Encoder::encode_no_operand(const std::string &name, std::uint8_t &byte) const
 {
     if (name == "nop")
     {
@@ -40,7 +40,7 @@ bool X86::encode_no_operand(const std::string &name, std::uint8_t &byte) const
     }
     return false;
 }
-bool X86::encode_immediate(
+bool X86Encoder::encode_immediate(
     const std::string &name,
     const std::string &reg,
     std::uint64_t value,
@@ -61,7 +61,7 @@ bool X86::encode_immediate(
     bytes.push_back({static_cast<std::uint8_t>(value)});
     return true;
 }
-bool X86::encode_near_jump(
+bool X86Encoder::encode_near_jump(
     std::int64_t displacement,
     std::vector<std::uint8_t> &bytes,
     std::string &error) const
@@ -77,7 +77,7 @@ bool X86::encode_near_jump(
     bytes.push_back(static_cast<std::uint8_t>(value >> 8)); // High byte
     return true;
 }
-bool X86::near_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
+bool X86Decoder::near_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
                                  std::int64_t &displacement) const
 {
     if (offset >= bytes.size() || bytes.size() - offset < 3 || bytes[offset] != 0xE9)
@@ -87,14 +87,14 @@ bool X86::near_jump_displacement(const std::vector<std::uint8_t> &bytes, std::si
     return true;
 }
 
-bool X86::encode_far_jump(
+bool X86Encoder::encode_far_jump(
     std::uint64_t segment,
     std::uint64_t offset,
     std::vector<std::uint8_t> &bytes,
     std::string &error) const
 {
     // Far jump encoding is only supported in 16-bit mode
-    if (mode != X86Mode::Bits16)
+    if (cpu_.getMode() != X86Mode::Bits16)
     {
         error = "far jump encoding is only supported in 16-bit mode";
         return false;
@@ -115,7 +115,7 @@ bool X86::encode_far_jump(
 }
 
 // Decoding
-bool X86::decode(
+bool X86Decoder::decode(
     const std::vector<std::uint8_t> &bytes,
     std::size_t &offset,
     std::string &text) const
@@ -140,7 +140,7 @@ bool X86::decode(
         return false;
     }
 }
-bool X86::decode_no_operand(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+bool X86Decoder::decode_no_operand(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
     if (offset >= bytes.size())
         return false;
@@ -155,7 +155,7 @@ bool X86::decode_no_operand(const std::vector<std::uint8_t> &bytes, std::size_t 
     return false;
 }
 
-bool X86::decode_immediate(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+bool X86Decoder::decode_immediate(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
     if (offset + 1 >= bytes.size())
         return false;
@@ -170,7 +170,7 @@ bool X86::decode_immediate(const std::vector<std::uint8_t> &bytes, std::size_t &
 
     return false;
 }
-bool X86::decode_short_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+bool X86Decoder::decode_short_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
     std::int64_t displacement = 0;
     if (!short_jump_displacement(bytes, offset, displacement))
@@ -180,7 +180,7 @@ bool X86::decode_short_jump(const std::vector<std::uint8_t> &bytes, std::size_t 
     return true;
 }
 
-bool X86::short_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
+bool X86Decoder::short_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
                                   std::int64_t &displacement) const
 {
     if (offset >= bytes.size() || bytes.size() - offset < 2 || bytes[offset] != 0xEB)
@@ -189,11 +189,8 @@ bool X86::short_jump_displacement(const std::vector<std::uint8_t> &bytes, std::s
     displacement = value < 128 ? value : static_cast<int>(value) - 256;
     return true;
 }
-bool X86::decode_near_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+bool X86Decoder::decode_near_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
-    const auto value = bytes[offset + 1] | (bytes[offset + 2] << 8);
-
-    // High byte of displacement will be handled in near_jump_displacement
     std::int64_t displacement = 0;
     if (!near_jump_displacement(bytes, offset, displacement))
         return false;
@@ -201,9 +198,9 @@ bool X86::decode_near_jump(const std::vector<std::uint8_t> &bytes, std::size_t &
     text = "jmp " + std::to_string(displacement);
     return true;
 }
-bool X86::decode_far_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+bool X86Decoder::decode_far_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
-    if(mode != X86Mode::Bits16 || offset >= bytes.size() || bytes.size() - offset < 5)
+    if(cpu_.getMode() != X86Mode::Bits16 || offset >= bytes.size() || bytes.size() - offset < 5)
         return false;
     if (bytes[offset] == 0xEA)
     {

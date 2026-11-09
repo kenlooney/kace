@@ -14,98 +14,13 @@
  * GNU General Public License for more details.
  */
 #pragma once
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "assembler.hpp"
+#include "disassembler.hpp"
 class Cpu
 {
 public:
     virtual ~Cpu() = default;
-    // Encoding
-    virtual bool encode_no_operand(const std::string &name, std::uint8_t &byte) const
-    {
-        return false;
-    };
-    virtual bool encode_immediate(
-        const std::string &name,
-        const std::string &reg,
-        std::uint64_t value,
-        std::vector<std::vector<std::uint8_t>> &bytes,
-        std::string &error) const
-    {
-        error = "immediate encoding is not supported by this CPU";
-        return false;
-    }
-    virtual bool encode_short_jump(
-        std::int64_t displacement,
-        std::vector<std::uint8_t> &bytes,
-        std::string &error) const
-    {
-        error = "short jump encoding is not supported by this CPU";
-        return false;
-    }
-    virtual bool encode_near_jump(
-        std::int64_t displacement,
-        std::vector<std::uint8_t> &bytes,
-        std::string &error) const
-    {
-        error = "near jump encoding is not supported by this CPU";
-        return false;
-    }
+    virtual const Assembler *assembler() const = 0;
+    virtual const Disassembler *disassembler() const { return nullptr; }
 
-    virtual bool encode_far_jump(
-        std::uint64_t segment,
-        std::uint64_t offset,
-        std::vector<std::uint8_t> &bytes,
-        std::string &error) const
-    {
-        error = "far jump encoding is not supported by this CPU";
-        return false;
-    }
-
-
-    // Decoding
-    virtual bool decode(
-        const std::vector<std::uint8_t> &,
-        std::size_t &,
-        std::string &) const
-    {
-        return false;
-    }
-    virtual bool decode_no_operand(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
-    {
-        text = "no operand decoding is not supported by this CPU";
-        return false;
-    }
-    virtual bool decode_immediate(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
-    {
-        text = "immediate decoding is not supported by this CPU";
-        return false;
-    }
-    virtual bool decode_short_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
-    {
-        text = "short jump decoding is not supported by this CPU";
-        return false;
-    }
-    virtual bool decode_near_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
-    {
-        text = "near jump decoding is not supported by this CPU";
-        return false;
-    }
-    // Reports the displacement only when the instruction at offset is a short jump.
-    virtual bool short_jump_displacement(const std::vector<std::uint8_t>&, std::size_t, std::int64_t&) const
-    {
-        return false;
-    }
-    virtual bool near_jump_displacement(const std::vector<std::uint8_t>&, std::size_t, std::int64_t&) const
-    {
-        return false;
-    }
-
-    virtual bool decode_far_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
-    {
-        text = "far jump decoding is not supported by this CPU";
-        return false;
-    }
- 
 };

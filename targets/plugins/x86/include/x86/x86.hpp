@@ -15,6 +15,10 @@
  */
 #pragma once
 #include <kace/cpu.hpp>
+#include <x86/x86Encoder.hpp>
+#include <x86/x86Decoder.hpp>
+#include <x86/x86Assembler.hpp>
+#include <x86/x86Disassembler.hpp>
 
 enum class X86Mode {
     Bits16,
@@ -23,52 +27,15 @@ enum class X86Mode {
 };
 class X86 : public Cpu {
     public:
+    X86() : enc(*this), dec(*this), assembler_(*this), disassembler_(*this) {}
+    X86(const X86&) = delete;
+    X86& operator=(const X86&) = delete;
     virtual ~X86() = default;
-    // Encoding
-    virtual bool encode_no_operand(const std::string& name, std::uint8_t& byte) const override;
-    virtual bool encode_immediate(
-        const std::string& name, 
-        const std::string& reg, 
-        std::uint64_t value,
-        std::vector<std::vector<std::uint8_t>>& bytes,
-        std::string& error
-    ) const override;
-    bool encode_short_jump(
-        std::int64_t displacement,
-        std::vector<std::uint8_t>& bytes,
-        std::string& error
-    ) const override;
-    bool encode_near_jump(
-        std::int64_t displacement,
-        std::vector<std::uint8_t>& bytes,
-        std::string& error
-    ) const override;
+    const X86Encoder* encoder() const { return &enc; }
+    const X86Decoder* decoder() const { return &dec; }
+    const Assembler* assembler() const override { return &assembler_; }
+    const Disassembler* disassembler() const override { return &disassembler_; }
 
-    bool encode_far_jump(
-        std::uint64_t segment,
-        std::uint64_t offset,
-        std::vector<std::uint8_t>& bytes,
-        std::string& error
-    ) const override;
-
-    // Decoding
-    bool decode(
-        const std::vector<std::uint8_t>& bytes,
-        std::size_t& offset,
-        std::string& text
-    ) const override;
-    bool decode_no_operand(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
-    bool decode_short_jump(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
-    bool short_jump_displacement(const std::vector<std::uint8_t>& bytes, std::size_t offset,
-                                 std::int64_t& displacement) const override;
-    bool decode_immediate(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
-    bool decode_near_jump(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
-    bool decode_far_jump(const std::vector<std::uint8_t>& bytes, std::size_t& offset, std::string& text) const override;
-
-    bool near_jump_displacement(const std::vector<std::uint8_t>& bytes, std::size_t offset,
-                                std::int64_t& displacement) const override;
-   
-   
     // Other Public Functions
     X86Mode getMode() const { return mode; }
     void setMode(X86Mode newMode) { mode = newMode; }
@@ -76,5 +43,8 @@ class X86 : public Cpu {
     // Fields
     private:
     X86Mode mode = X86Mode::Bits16; // Default to 16-bit mode
-    
+    X86Encoder enc;
+    X86Decoder dec;
+    X86Assembler assembler_;
+    X86Disassembler disassembler_;
 };

@@ -38,14 +38,3 @@ bool check_byte(const Statement& statement, std::uint8_t& byte, std::string& err
     byte = static_cast<std::uint8_t>(statement.value);
     return true;
 }
-
-bool encode_statement(const Statement& statement, const Cpu& cpu, std::uint8_t& byte, std::string& error) {
-    if (statement.type != DataType::None) {
-        return check_byte(statement, byte, error);
-    }
-    if (!statement.expression.nodes.empty() || !cpu.encode_no_operand(statement.name, byte)) {
-        error = "Unsupported instruction or operands: " + statement.name;
-        return false;
-    }
-    return true;
-}
