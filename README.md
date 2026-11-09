@@ -293,6 +293,13 @@ Planned development includes:
 
 ## Releases
 
+After publishing, the release workflow keeps the five most recently published
+`kace-dev-...` development snapshots and the three most recently published
+`kace-...` stable releases. Older matching releases, their assets, and their
+tags are deleted. Drafts, unrelated releases, and standalone tags are not
+included in this cleanup. Immutable releases cannot be removed by the
+workflow; retention reports an error if an older matching release is immutable.
+
 | Type | Description |
 |------|-------------|
 | Development snapshot | The current development version. It may change frequently and may contain incomplete features. |

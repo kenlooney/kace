@@ -114,6 +114,9 @@ jobs:
   publish:
     needs: [metadata, build]
     runs-on: ubuntu-24.04
+    concurrency:
+      group: release-publication
+      cancel-in-progress: false
     permissions:
       contents: write
     env:
@@ -122,6 +125,9 @@ jobs:
       RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
       PRERELEASE: ${{ needs.metadata.outputs.prerelease }}
     steps:
+      - uses: actions/checkout@v5
+      - name: Verify release retention rules
+        run: node --test .github/scripts/prune-releases.test.mjs
       - name: Download all platform archives
         uses: actions/download-artifact@v4
         with:
@@ -169,3 +175,6 @@ jobs:
           else
             gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
           fi
+
+          # Retain the newest published snapshots and stable releases, including their tags.
+          node .github/scripts/prune-releases.mjs
