@@ -35,4 +35,5 @@
 .directive-list h3 { margin: 0 0 10px; font-size: 21px; font-weight: 500; }
 .directive-list p { margin: 0; max-width: 650px; color: #52665a; font-size: 14px; line-height: 1.8; }
 .directive-list code { font-family: var(--mono); font-size: .9em; overflow-wrap: anywhere; }
+.directive-example { max-width: 650px; margin: 16px 0; padding: 16px 20px; overflow-x: auto; background: #172724; color: #e2ebd9; font: 13px/1.8 var(--mono); }
 @media (max-width: 850px) { .directive-list article { grid-template-columns: 1fr; gap: 14px; } }

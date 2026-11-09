@@ -150,7 +150,17 @@
           <article><div><h3>Define a byte</h3><code>byte 42</code></div><p>Emit one byte from an expression. <code>definebyte</code> and <code>db</code> are aliases; the value must fit in a byte.</p></article>
           <article><div><h3>Repeat and pad</h3><code>fill 4 byte 0</code></div><p><code>times</code>, <code>repeat</code>, and <code>dup</code> also repeat bytes. Counts may use <code>currentposition</code> and <code>sectionstart</code> to pad to an offset. Repetition is limited to one million bytes per directive.</p></article>
           <article><div><h3>Include a file</h3><code>#include "data/extra.asm"</code></div><p>Insert another source file during source expansion. Nested includes share the program's labels and output; relative paths start from the including file, and cycles are rejected.</p></article>
-          <article><div><h3>Check a position</h3><code>#assertposition 2</code></div><p>During assembly, check that the output is at the specified byte offset. The argument is an integer literal; the directive emits no bytes and reports an error if the position differs.</p></article>
+          <article>
+            <div><h3>Check a position</h3><code>#assertposition 2</code></div>
+            <div>
+              <p>During assembly, check that the output is at the specified byte offset. The argument is an integer literal; the directive emits no bytes and reports an error if the position differs.</p>
+              <pre class="directive-example"><code>byte 1
+byte 2
+#assertposition 2  ; passes after two bytes
+byte 3</code></pre>
+              <p>The output is <code>01 02 03</code>; the assertion adds no bytes.</p>
+            </div>
+          </article>
         </div>
       </div>
     </section>
