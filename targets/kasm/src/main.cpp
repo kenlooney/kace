@@ -308,6 +308,12 @@ int main(int argc, char *argv[])
         if (!loadCpu(commandLine, argv[0], loader, error))
             return 1;
 
+        if (loader.cpu()->disassembler() == nullptr)
+        {
+            std::cerr << "kasm: selected CPU does not provide a disassembler\n";
+            return 1;
+        }
+
         auto symbolsPath = inputPath;
         symbolsPath.replace_extension(".sym");
         SymbolTable symbols;
@@ -323,86 +329,15 @@ int main(int argc, char *argv[])
             std::cerr << "kasm: disassembly output must differ from the symbol file\n";
             return 1;
         }
-        std::map<std::size_t, std::vector<std::string>> labels;
-        for (const Symbol &symbol : symbols.getSymbolsByKind(SymbolKind::Label))
-            labels[symbol.offset].push_back(symbol.name);
-        for (auto &entry : labels)
-            std::sort(entry.second.begin(), entry.second.end());
-
-        struct DecodedInstruction
+        std::string decoded;
+        if (!loader.cpu()->disassembler()->disassemble(bytes, symbols, decoded, error))
         {
-            std::size_t offset;
-            std::size_t end;
-            std::string text;
-        };
-        std::vector<DecodedInstruction> instructions;
-        std::size_t offset = 0;
-        while (offset < bytes.size())
-        {
-            const std::size_t start = offset;
-            std::string text;
-            if (!loader.cpu()->decode(bytes, offset, text) || offset <= start || offset > bytes.size())
-            {
-                std::cerr << "kasm: could not decode instruction at byte offset " << start << "\n";
-                return 1;
-            }
-            instructions.push_back({start, offset, text});
+            std::cerr << error << "\n";
+            return 1;
         }
-        for (const auto &label : labels)
-        {
-            if (label.first != bytes.size() && std::none_of(instructions.begin(), instructions.end(),
-                                                            [&](const DecodedInstruction &instruction)
-                                                            { return instruction.offset == label.first; }))
-            {
-                std::cerr << "kasm: symbol offset is not an instruction boundary: " << label.first << "\n";
-                return 1;
-            }
-        }
-        std::ostringstream decoded;
-        for (const auto &instruction : instructions)
-        {
-            const auto definitions = labels.find(instruction.offset);
-            if (definitions != labels.end())
-                for (const auto &name : definitions->second)
-                    decoded << name << ":\n";
-            std::int64_t displacement = 0;
-            std::string text = instruction.text;
-            const char *jumpType = nullptr;
-            if (loader.cpu()->short_jump_displacement(bytes, instruction.offset, displacement))
-                jumpType = "short";
-            else if (loader.cpu()->near_jump_displacement(bytes, instruction.offset, displacement))
-                jumpType = "near";
-            if (jumpType != nullptr)
-            {
-                std::size_t target = instruction.end;
-                bool valid = true;
-                if (displacement < 0)
-                {
-                    const auto magnitude = static_cast<std::uint64_t>(-(displacement + 1)) + 1;
-                    if (magnitude > target)
-                        valid = false;
-                    else
-                        target -= static_cast<std::size_t>(magnitude);
-                }
-                else if (static_cast<std::uint64_t>(displacement) > bytes.size() - target)
-                    valid = false;
-                else
-                    target += static_cast<std::size_t>(displacement);
-                const auto found = valid ? labels.find(target) : labels.end();
-                if (found != labels.end())
-                    text = std::string("jmp ") + jumpType + " " + found->second.front();
-            }
-
-            decoded << text << '\n';
-        }
-
-        const auto endLabels = labels.find(bytes.size());
-        if (endLabels != labels.end())
-            for (const auto &name : endLabels->second)
-                decoded << name << ":\n";
         std::ofstream output(outputPath, std::ios::binary);
         if (output)
-            output << decoded.str();
+            output << decoded;
         output.close();
         if (!output)
         {
@@ -444,147 +379,16 @@ int main(int argc, char *argv[])
 
         SymbolTable symbolTable;
         std::vector<std::uint8_t> bytes;
-        std::vector<JumpFixup> jumpFixups;
-        // Pass 1 - Encode statements and collect jump fixups
-        std::cout << "Encoding statements and collecting jump fixups...\n";
-        for (Statement &statement : statements)
+        const Assembler* assembler = loader.cpu()->assembler();
+        if (assembler == nullptr)
         {
-            statement.offset = bytes.size();
-            if (
-                statement.kind == StatementKind::Directive && 
-                statement.directiveStage == DirectiveStage::Assembly &&
-                statement.directiveKind == DirectiveKind::AssertPosition
-            )
-            {
-                if(statement.offset != statement.assertPosition)
-                {
-                    std::cerr << statement.sourceName << ":" << statement.line << ": Assert position failed: expected " << statement.assertPosition << ", got " << statement.offset << "\n";
-                    return 1;
-                }
-                continue;
-            }
-            if (statement.kind == StatementKind::Label)
-            {
-                if (!symbolTable.addLabel(statement.name, statement.offset))
-                {
-                    std::cerr << statement.sourceName << ":" << statement.line << ": Duplicate label: " << statement.name << "\n";
-                    return 1;
-                }
-                continue;
-            }
-            if (statement.kind == StatementKind::JumpShort)
-            {
-                jumpFixups.push_back({statement.target, statement.offset, statement.line, JumpKind::Short, statement.sourceName});
-                bytes.push_back(0); // Placeholder for the jump instruction byte
-                bytes.push_back(0);
-                continue;
-            }
-            if (statement.kind == StatementKind::JumpNear)
-            {
-                jumpFixups.push_back({statement.target, statement.offset, statement.line, JumpKind::Near, statement.sourceName});
-                bytes.push_back(0); // Placeholder for the jump instruction byte
-                bytes.push_back(0);
-                bytes.push_back(0); // Extra byte for the near jump offset
-                continue;
-            }
-            if (statement.kind == StatementKind::JumpFar)
-            {
-                std::vector<std::uint8_t> encoded;
-                if (!loader.cpu()->encode_far_jump(statement.farSegment, statement.farOffset, encoded, error))
-                {
-                    std::cerr << statement.sourceName << ":" << statement.line << ": " << error << "\n";
-                    return 1;
-                }
-                bytes.insert(bytes.end(), encoded.begin(), encoded.end());
-                continue;
-            }
-
-            // Times directive handling
-            std::uint8_t byte = 0;
-
-            if (statement.kind == StatementKind::Times)
-            {
-                if (!check_byte(statement, byte, error))
-                {
-                    std::cerr << statement.sourceName << ":" << statement.line
-                              << ": " << error << "\n";
-                    return 1;
-                }
-
-                Parser evaluator(std::vector<Token>{});
-                PositionContext positions{statement.offset, 0};
-
-                if (!evaluator.evaluate(
-                        statement.countExpression,
-                        statement.countExpression.root,
-                        statement.count,
-                        error,
-                        &positions))
-                {
-                    std::cerr << statement.sourceName << ":" << statement.line
-                              << ": " << error << "\n";
-                    return 1;
-                }
-
-                if (statement.count > 1000000)
-                {
-                    std::cerr << statement.sourceName << ":" << statement.line
-                              << ": Repeat count exceeds the limit\n";
-                    return 1;
-                }
-
-                bytes.insert(bytes.end(), statement.count, byte);
-                continue;
-            }
-
-            if (!encode_statement(statement, *loader.cpu(), byte, error))
-            {
-                std::cerr << statement.sourceName << ":" << statement.line << ": " << error << "\n";
-                return 1;
-            }
-            bytes.push_back(byte);
+            std::cerr << "kasm: selected CPU does not provide an assembler\n";
+            return 1;
         }
-        // Pass 2 -
-        std::cout << "Running pass 2...\n";
-        for (const JumpFixup &fixup : jumpFixups)
+        if (!assembler->assemble(statements, bytes, symbolTable, error))
         {
-            const Symbol *label = symbolTable.getSymbol(fixup.target);
-            if (label == nullptr)
-            {
-                std::cerr << fixup.sourceName << ":" << fixup.line
-                          << ": Unknown label: " << fixup.target << "\n";
-                return 1;
-            }
-            const std::size_t jumpSize = fixup.kind == JumpKind::Near ? 3 : 2;
-            const std::int64_t displacement = static_cast<std::int64_t>(label->offset) - static_cast<std::int64_t>(fixup.offset) - static_cast<std::int64_t>(jumpSize);
-            std::vector<std::uint8_t> encoded;
-            bool success = false;
-
-            if (fixup.kind == JumpKind::Short)
-            {
-                success = loader.cpu()->encode_short_jump(displacement, encoded, error);
-            }
-            else if (fixup.kind == JumpKind::Near)
-            {
-                success = loader.cpu()->encode_near_jump(displacement, encoded, error);
-            }
-            else if (fixup.kind == JumpKind::Far)
-            {
-                success = false; // Far jump encoding not implemented yet
-            }
-
-            if (!success || encoded.size() != jumpSize)
-            {
-                std::cerr << fixup.sourceName << ":" << fixup.line
-                          << ": " << (error.empty() ? "Invalid jump encoding" : error)
-                          << "\n";
-                return 1;
-            }
-
-            for (std::size_t i = 0; i < encoded.size(); ++i)
-            {
-                bytes[fixup.offset + i] = encoded[i];
-            }
+            std::cerr << error << "\n";
+            return 1;
         }
         const std::filesystem::path binaryPath{std::string(commandLine.output)};
         auto symbolsPath = binaryPath;

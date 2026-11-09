@@ -174,6 +174,20 @@ byte 3</code></pre>
           <p>CPU plugins give KASM a way to work with different architectures. Select a plugin by name when assembling,
             or build one for a new CPU.</p>
         </div>
+        <div class="plugin-architecture">
+          <div>
+            <p class="plugin-label">HOW IT FITS TOGETHER</p>
+            <h3>One CLI. Different machines.</h3>
+            <p>KASM reads your source and hands its statements to the selected plugin's assembler. The plugin
+              handles its own instruction encoding and jump fixups. For disassembly, the CLI hands the bytes
+              and any symbols to the plugin's disassembler.</p>
+          </div>
+          <div class="plugin-flow" aria-label="KASM sends statements to a CPU plugin assembler and bytes to its disassembler">
+            <div><span>SOURCE</span><strong>KASM</strong><span>STATEMENTS →</span><strong>Assembler</strong><span>→ BYTES</span></div>
+            <div><span>BINARY</span><strong>KASM</strong><span>BYTES →</span><strong>Disassembler</strong><span>→ TEXT</span></div>
+            <small>Assembler and disassembler are provided by the selected CPU plugin.</small>
+          </div>
+        </div>
         <div class="plugins-grid">
           <div>
             <p class="plugin-label">INCLUDED WITH KASM</p>
@@ -193,14 +207,14 @@ byte 3</code></pre>
             <p class="plugin-label">ADDING A CPU PLUGIN</p>
             <h3>Bring another architecture.</h3>
             <ol>
-              <li>Override the KACE <code>Cpu</code> operations supported by your target architecture; the default implementations report unsupported operations.</li>
+              <li>Provide a <code>Cpu</code> with an <code>Assembler</code> for your architecture and, optionally, a <code>Disassembler</code>.</li>
               <li>Build it as a shared library and export the C factory functions <code>create_cpu</code> and
                 <code>destroy_cpu</code>.</li>
               <li>Place the library next to the KASM executable. Use the platform’s shared-library naming convention,
                 such as <code>x86.dll</code> on Windows or <code>libx86.so</code> on Linux.</li>
               <li>Select it with <code>--cpu=&lt;name&gt;</code> when producing output.</li>
             </ol>
-            <p>The plugin interface and supported instructions are still evolving.</p>
+            <p>The plugin interface and shared statement model are still evolving; plugins must be built against the matching KACE interface.</p>
           </div>
         </div>
       </div>
