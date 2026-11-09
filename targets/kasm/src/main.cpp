@@ -199,6 +199,55 @@ bool loadCpu(const CommandLine &commandLine, const char *argv0, Loader &loader, 
     }
     return true;
 }
+
+bool expandIncludes(const Source &source, std::vector<Statement> &statements,
+                    std::vector<std::filesystem::path> &active, std::string &error)
+{
+    std::error_code pathError;
+    const auto sourcePath = std::filesystem::canonical(source.name, pathError);
+    if (pathError)
+    {
+        error = "kasm: could not resolve source file: " + source.name;
+        return false;
+    }
+    if (std::find(active.begin(), active.end(), sourcePath) != active.end())
+    {
+        error = "Include cycle detected: " + source.name;
+        return false;
+    }
+    if (active.size() >= 128)
+    {
+        error = "Include nesting limit exceeded: " + source.name;
+        return false;
+    }
+    active.push_back(sourcePath);
+    const std::vector<Token> tokens;
+    KasmParser parser(tokens);
+    std::vector<Statement> parsed;
+    if (!parser.parse(source, parsed, error))
+        return false;
+    for (Statement &statement : parsed)
+    {
+        if (statement.kind == StatementKind::Directive &&
+            statement.directiveKind == DirectiveKind::Include)
+        {
+            const auto path = sourcePath.parent_path() / std::filesystem::path(statement.includePath);
+            Source included;
+            if (!Source::load(path.string(), included))
+            {
+                error = source.name + ":" + std::to_string(statement.line) +
+                        ": Could not open include file: " + path.string();
+                return false;
+            }
+            if (!expandIncludes(included, statements, active, error))
+                return false;
+        }
+        else
+            statements.push_back(std::move(statement));
+    }
+    active.pop_back();
+    return true;
+}
 int main(int argc, char *argv[])
 {
     const auto commandLine = parseCommandLine(argc, argv);
@@ -377,9 +426,8 @@ int main(int argc, char *argv[])
             std::cerr << "kasm: could not open input file: " << commandLine.input << "\n";
             return 1;
         }
-        const std::vector<Token> tokens;
-        KasmParser parser(tokens);
-        if (!parser.parse(source, statements, error))
+        std::vector<std::filesystem::path> active;
+        if (!expandIncludes(source, statements, active, error))
         {
             std::cerr << error << "\n";
             return 1;
@@ -405,21 +453,21 @@ int main(int argc, char *argv[])
             {
                 if (!symbolTable.addLabel(statement.name, statement.offset))
                 {
-                    std::cerr << commandLine.input << ":" << statement.line << ": Duplicate label: " << statement.name << "\n";
+                    std::cerr << statement.sourceName << ":" << statement.line << ": Duplicate label: " << statement.name << "\n";
                     return 1;
                 }
                 continue;
             }
             if (statement.kind == StatementKind::JumpShort)
             {
-                jumpFixups.push_back({statement.target, statement.offset, statement.line, JumpKind::Short});
+                jumpFixups.push_back({statement.target, statement.offset, statement.line, JumpKind::Short, statement.sourceName});
                 bytes.push_back(0); // Placeholder for the jump instruction byte
                 bytes.push_back(0);
                 continue;
             }
             if (statement.kind == StatementKind::JumpNear)
             {
-                jumpFixups.push_back({statement.target, statement.offset, statement.line, JumpKind::Near});
+                jumpFixups.push_back({statement.target, statement.offset, statement.line, JumpKind::Near, statement.sourceName});
                 bytes.push_back(0); // Placeholder for the jump instruction byte
                 bytes.push_back(0);
                 bytes.push_back(0); // Extra byte for the near jump offset
@@ -430,7 +478,7 @@ int main(int argc, char *argv[])
                 std::vector<std::uint8_t> encoded;
                 if (!loader.cpu()->encode_far_jump(statement.farSegment, statement.farOffset, encoded, error))
                 {
-                    std::cerr << commandLine.input << ":" << statement.line << ": " << error << "\n";
+                    std::cerr << statement.sourceName << ":" << statement.line << ": " << error << "\n";
                     return 1;
                 }
                 bytes.insert(bytes.end(), encoded.begin(), encoded.end());
@@ -444,7 +492,7 @@ int main(int argc, char *argv[])
             {
                 if (!check_byte(statement, byte, error))
                 {
-                    std::cerr << commandLine.input << ":" << statement.line
+                    std::cerr << statement.sourceName << ":" << statement.line
                               << ": " << error << "\n";
                     return 1;
                 }
@@ -459,14 +507,14 @@ int main(int argc, char *argv[])
                         error,
                         &positions))
                 {
-                    std::cerr << commandLine.input << ":" << statement.line
+                    std::cerr << statement.sourceName << ":" << statement.line
                               << ": " << error << "\n";
                     return 1;
                 }
 
                 if (statement.count > 1000000)
                 {
-                    std::cerr << commandLine.input << ":" << statement.line
+                    std::cerr << statement.sourceName << ":" << statement.line
                               << ": Repeat count exceeds the limit\n";
                     return 1;
                 }
@@ -477,7 +525,7 @@ int main(int argc, char *argv[])
 
             if (!encode_statement(statement, *loader.cpu(), byte, error))
             {
-                std::cerr << commandLine.input << ":" << statement.line << ": " << error << "\n";
+                std::cerr << statement.sourceName << ":" << statement.line << ": " << error << "\n";
                 return 1;
             }
             bytes.push_back(byte);
@@ -489,7 +537,7 @@ int main(int argc, char *argv[])
             const Symbol *label = symbolTable.getSymbol(fixup.target);
             if (label == nullptr)
             {
-                std::cerr << commandLine.input << ":" << fixup.line
+                std::cerr << fixup.sourceName << ":" << fixup.line
                           << ": Unknown label: " << fixup.target << "\n";
                 return 1;
             }
@@ -513,7 +561,7 @@ int main(int argc, char *argv[])
 
             if (!success || encoded.size() != jumpSize)
             {
-                std::cerr << commandLine.input << ":" << fixup.line
+                std::cerr << fixup.sourceName << ":" << fixup.line
                           << ": " << (error.empty() ? "Invalid jump encoding" : error)
                           << "\n";
                 return 1;

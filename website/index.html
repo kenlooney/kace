@@ -113,8 +113,11 @@
             fills to offset 10. The shorter <code>$</code> and <code>$$</code> spellings are also supported.
             Repetition currently emits bytes only, with a limit of one million per directive. In flat output,
             <code>sectionstart</code> is zero.</p>
+          <p>Organize a program across files with <code>#include "data/extra.asm"</code>. Included files can
+            include others, and their statements share the program's labels and output. Relative paths are
+            resolved from the file containing the directive; include cycles are reported as errors.</p>
           <p>KASM can resolve short and 16-bit near jumps to labels before or after an instruction. Use
-            <code>jmp short</code> or <code>jmp near</code>; <code>jump</code> is an alias
+            <code>jmp short</code> or <code>jmp near</code>; <code>jump</code> and <code>goto</code> are aliases
             for <code>jmp</code>. KASM also assembles and disassembles 16-bit far jumps such as
             <code>jmp far 0x1234:0x5678</code>, using numeric segment and offset values.
           </p>
@@ -122,7 +125,7 @@
             Assembly saves labels in a matching <code>.sym</code> file, which the disassembler can use to restore
             short- and near-jump targets. Without the symbol file, those jumps show their relative displacement.
             Disassembly uses standard instruction names like <code>jmp</code>, even when the source used
-            an alias such as <code>jump</code>.
+            an alias such as <code>jump</code> or <code>goto</code>.
           </p><a class="inline-link" href="#download">EXPLORE RELEASES <span>↗</span></a>
         </div>
         <div class="code-card">
