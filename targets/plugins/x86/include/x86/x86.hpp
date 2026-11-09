@@ -14,6 +14,7 @@
  * GNU General Public License for more details.
  */
 #pragma once
+#include <cstddef>
 #include <kace/cpu.hpp>
 #include <x86/x86Encoder.hpp>
 #include <x86/x86Decoder.hpp>
@@ -25,6 +26,9 @@ enum class X86Mode {
     Bits32,
     Bits64
 };
+
+std::size_t near_displacement_size(X86Mode mode);
+
 class X86 : public Cpu {
     public:
     X86() : enc(*this), dec(*this), assembler_(*this), disassembler_(*this) {}

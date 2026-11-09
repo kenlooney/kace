@@ -116,7 +116,7 @@
           <p>Organize a program across files with <code>#include "data/extra.asm"</code>. Included files can
             include others, and their statements share the program's labels and output. Relative paths are
             resolved from the file containing the directive; include cycles are reported as errors.</p>
-          <p>KASM can resolve short and 16-bit near jumps to labels before or after an instruction. Use
+          <p>KASM can resolve short and near jumps to labels before or after an instruction. Use
             <code>jmp short</code> or <code>jmp near</code>; <code>jump</code> and <code>goto</code> are aliases
             for <code>jmp</code>. KASM also assembles and disassembles 16-bit far jumps such as
             <code>jmp far 0x1234:0x5678</code>, using numeric segment and offset values.
@@ -195,9 +195,10 @@ byte 3</code></pre>
               <!-- Add more CPU plugins as list items here. -->
               <li>
                 <div><strong>x86</strong><span>DEFAULT CPU</span></div>
-                <p>The assembler supports <code>nop</code>, short jumps, and 16-bit near and far jumps. The CLI can disassemble
+                <p>The assembler supports <code>nop</code>, short jumps, mode-aware near jumps, and 16-bit far jumps. The CLI can disassemble
                   <code>nop</code>, <code>mov al</code> with an immediate, and those jump forms. The plugin can also
                   encode immediate <code>mov al</code>, but that encoding is not yet connected to the CLI.</p>
+                <p>The CLI currently uses 16-bit mode. Through the plugin's C++ API, near jumps also support 32- and 64-bit modes with 32-bit relative displacements; CLI mode selection is still planned.</p>
               </li>
             </ul>
             <p class="plugin-note">Select the included plugin with <code>--cpu=x86</code> or <code>-c x86</code>. x86 is
