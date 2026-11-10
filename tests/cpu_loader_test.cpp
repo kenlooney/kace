@@ -26,9 +26,11 @@ class ExampleCpu : public Cpu {
 public:
     const Assembler* assembler() const override { return &assembler_; }
     const Disassembler* disassembler() const override { return &disassembler_; }
+    const RegisterFile& registers() const override { return registers_; }
 private:
     ExampleAssembler assembler_;
     ExampleDisassembler disassembler_;
+    RegisterFile registers_;
 };
 
 int main(int argc, char* argv[]) {

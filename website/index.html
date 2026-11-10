@@ -196,9 +196,10 @@ byte 3</code></pre>
               <li>
                 <div><strong>x86</strong><span>DEFAULT CPU</span></div>
                 <p>The assembler supports <code>nop</code>, short jumps, mode-aware near jumps, and 16-bit far jumps. The CLI can disassemble
-                  <code>nop</code>, <code>mov al</code> with an immediate, and those jump forms. The plugin can also
-                  encode immediate <code>mov al</code>, but that encoding is not yet connected to the CLI.</p>
-                <p>The CLI currently uses 16-bit mode. Through the plugin's C++ API, near jumps also support 32- and 64-bit modes with 32-bit relative displacements; CLI mode selection is still planned.</p>
+                  <code>nop</code>, <code>mov al</code> with an immediate, and those jump forms.</p>
+                <p>Source statements <code>code16</code>, <code>code32</code>, and <code>code64</code> select the mode for subsequent near-jump assembly. Near jumps use a 16-bit displacement in 16-bit mode and a 32-bit displacement in 32- and 64-bit modes. The binary does not record mode changes for disassembly.</p>
+                <p>The x86 register file groups overlapping names such as <code>rax</code>, <code>eax</code>, <code>ax</code>, <code>al</code>, and <code>ah</code>. The framework exposes register files while the plugin supplies x86-specific widths and encoding IDs.</p>
+                <p>In 16-bit mode, the plugin's encoder supports immediate moves to the eight 8-bit registers <code>al</code> through <code>bh</code> and the eight 16-bit registers <code>ax</code> through <code>di</code>. For example, <code>mov cx, 0x1234</code> encodes as <code>B9 34 12</code>. This encoding is available through the C++ API; immediate moves are not yet connected to CLI assembly, and decoding currently supports only the <code>mov al</code> immediate form.</p>
               </li>
             </ul>
             <p class="plugin-note">Select the included plugin with <code>--cpu=x86</code> or <code>-c x86</code>. x86 is
@@ -208,7 +209,7 @@ byte 3</code></pre>
             <p class="plugin-label">ADDING A CPU PLUGIN</p>
             <h3>Bring another architecture.</h3>
             <ol>
-              <li>Provide a <code>Cpu</code> with an <code>Assembler</code> for your architecture and, optionally, a <code>Disassembler</code>.</li>
+              <li>Provide a <code>Cpu</code> with a register file and an <code>Assembler</code> for your architecture and, optionally, a <code>Disassembler</code>.</li>
               <li>Build it as a shared library and export the C factory functions <code>create_cpu</code> and
                 <code>destroy_cpu</code>.</li>
               <li>Place the library next to the KASM executable. Use the platform’s shared-library naming convention,
