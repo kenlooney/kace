@@ -27,6 +27,7 @@ enum class StatementKind {
     JumpNear,
     JumpFar,
     Times,
+    CodeSegment,
 
 
 };
@@ -54,6 +55,7 @@ struct Statement {
     std::string includePath; // For include directive, the path of the included file
     DirectiveStage directiveStage = DirectiveStage::SourceExpansion; // The stage at which the directive is processed
     std::uint64_t assertPosition = 0; // For assert position directive, the expected position
+    std::string codeSegment; // For code segment statements, the segment type (e.g., "code16", "code32", "code64")
 };
 
 bool parse_statement(const std::vector<Token>& tokens, Statement& statement, std::string& error);

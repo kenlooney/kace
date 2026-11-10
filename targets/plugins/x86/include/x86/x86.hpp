@@ -20,12 +20,8 @@
 #include <x86/x86Decoder.hpp>
 #include <x86/x86Assembler.hpp>
 #include <x86/x86Disassembler.hpp>
+#include <x86/mode.hpp>
 
-enum class X86Mode {
-    Bits16,
-    Bits32,
-    Bits64
-};
 
 std::size_t near_displacement_size(X86Mode mode);
 

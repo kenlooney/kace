@@ -84,6 +84,23 @@ public:
             statement.line = line_number;
             statement.sourceName = source.name;
 
+            // Check for code segment keywords like "code16", "code32", "code64" before identifiers
+            if (tokens[0].kind == "identifier" &&
+            
+                (tokens[0].text == "code16" || tokens[0].text == "code32" || tokens[0].text == "code64"))
+            {
+                if(tokens.size() != 1)
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Unexpected tokens after code segment declaration";
+                    return false;
+                }
+                statement.kind = StatementKind::CodeSegment;
+                statement.codeSegment = tokens[0].text;
+                statements.push_back(statement);
+                continue;
+            }
+            
             // Check for directives before identifiers
             if (tokens[0].kind == "directive")
             {
