@@ -85,6 +85,7 @@ std::vector<Token> KasmLexer::tokenize(const std::string& input) {
                addToken(Token{"label", input.substr(begin, cursor - begin), Span{begin, cursor}});
                continue;
            }
+
            addToken(Token{"identifier", input.substr(begin, cursor - begin), Span{begin, cursor}});
            continue;
        }

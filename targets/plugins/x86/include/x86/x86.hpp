@@ -20,18 +20,19 @@
 #include <x86/x86Decoder.hpp>
 #include <x86/x86Assembler.hpp>
 #include <x86/x86Disassembler.hpp>
+#include <x86/mode.hpp>
+#include <x86/x86Registers.hpp>
 
-enum class X86Mode {
-    Bits16,
-    Bits32,
-    Bits64
-};
 
 std::size_t near_displacement_size(X86Mode mode);
 
 class X86 : public Cpu {
     public:
-    X86() : enc(*this), dec(*this), assembler_(*this), disassembler_(*this) {}
+    X86() : enc(*this), 
+    dec(*this), 
+    assembler_(*this), 
+    disassembler_(*this)
+    {}
     X86(const X86&) = delete;
     X86& operator=(const X86&) = delete;
     virtual ~X86() = default;
@@ -39,7 +40,8 @@ class X86 : public Cpu {
     const X86Decoder* decoder() const { return &dec; }
     const Assembler* assembler() const override { return &assembler_; }
     const Disassembler* disassembler() const override { return &disassembler_; }
-
+    const X86RegisterFile& registers() const override { return registers_; }
+    X86RegisterFile& registers() { return registers_; }
     // Other Public Functions
     X86Mode getMode() const { return mode; }
     void setMode(X86Mode newMode) { mode = newMode; }
@@ -51,4 +53,6 @@ class X86 : public Cpu {
     X86Decoder dec;
     X86Assembler assembler_;
     X86Disassembler disassembler_;
+    X86RegisterFile registers_;
+    
 };

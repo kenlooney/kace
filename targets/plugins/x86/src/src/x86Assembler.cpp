@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <limits>
 #include <iostream>
+#include <x86/mode.hpp>
 
 bool X86Assembler::assemble(const std::vector<Statement> &statements,
                             std::vector<std::uint8_t> &bytes,
@@ -13,9 +14,12 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
 {
     // KEEP: First pass: calculate offsets and collect fixups
     std::cout << "Starting first pass" << std::endl;
+    // Start with the selected CPU mode
+    X86Mode current_mode = this->cpu_.getMode();
+
     std::vector<std::uint8_t> output;
     SymbolTable labels;
-    std::vector<JumpFixup> fixups;
+    std::vector<X86JumpFixup> fixups;
     auto fail = [&](const Statement &statement, const std::string &message)
     {
         error = statement.sourceName + ":" + std::to_string(statement.line) + ": " + message;
@@ -24,6 +28,25 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
     for (const Statement &statement : statements)
     {
         const std::size_t offset = output.size();
+
+        if (statement.kind == StatementKind::CodeSegment)
+        {
+            std::string segment = statement.codeSegment;
+            if (segment.empty())
+            {
+                return fail(statement, "Code segment name is empty");
+            }
+            if (segment == "code16")
+                current_mode = X86Mode::Bits16;
+            else if (segment == "code32")
+                current_mode = X86Mode::Bits32;
+            else if (segment == "code64")
+                current_mode = X86Mode::Bits64;
+            else
+                return fail(statement, "Unknown code segment mode: " + segment);
+            continue;
+        }
+
         if (statement.kind == StatementKind::Directive &&
             statement.directiveStage == DirectiveStage::Assembly &&
             statement.directiveKind == DirectiveKind::AssertPosition)
@@ -42,12 +65,14 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
         if (statement.kind == StatementKind::JumpShort || statement.kind == StatementKind::JumpNear)
         {
             const bool near = statement.kind == StatementKind::JumpNear;
-            const std::size_t displacementSize = near ? near_displacement_size(cpu_.getMode()) : 1;
+            const std::size_t displacementSize = near ? near_displacement_size(current_mode) : 1;
 
             if (displacementSize == 0)
                 return fail(statement, "Invalid CPU mode for near jump");
 
-            fixups.push_back({statement.target, offset, statement.line, near ? JumpKind::Near : JumpKind::Short, statement.sourceName});
+            fixups.push_back({{statement.target, offset, statement.line,
+                               near ? JumpKind::Near : JumpKind::Short, statement.sourceName},
+                              current_mode});
             output.insert(output.end(), 1 + displacementSize, 0);
             continue;
         }
@@ -95,8 +120,9 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
 
     // KEEP: Second pass: resolve jump fixups
     std::cout << "Starting second pass" << std::endl;
-    for (const JumpFixup &fixup : fixups)
+    for (const X86JumpFixup &fixup : fixups)
     {
+        cpu_.setMode(fixup.mode);
         const Symbol *label = labels.getSymbol(fixup.target);
         const std::string location = fixup.sourceName + ":" + std::to_string(fixup.line) + ": ";
         if (!label)
