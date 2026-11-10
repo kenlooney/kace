@@ -16,11 +16,14 @@
 #pragma once
 #include "assembler.hpp"
 #include "disassembler.hpp"
+#include "register.hpp"
+
 class Cpu
 {
 public:
     virtual ~Cpu() = default;
     virtual const Assembler *assembler() const = 0;
     virtual const Disassembler *disassembler() const { return nullptr; }
+    virtual const RegisterFile& registers() const = 0;
 
 };

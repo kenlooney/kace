@@ -4,6 +4,51 @@
 #include <iostream>
 #include <utility>
 
+bool test_register_file() {
+    X86 cpu;
+    X86RegisterFile& registers = cpu.registers();
+    X86Register* rax = registers.getRegisterByName("rax");
+    if (!rax || registers.getRegisterByName("eax") != rax ||
+        registers.getRegisterByName("ax") != rax ||
+        registers.getRegisterByName("ah") != rax ||
+        registers.getRegisterByName("al") != rax || registers.getRegisters().size() != 16) {
+        std::cerr << "Register aliases did not resolve to RAX\n";
+        return false;
+    }
+    rax->setValue(0x12345678ABCDEF42ULL);
+    std::uint64_t value = 0;
+    if (!registers.getRegisterValue("eax", value) || value != 0xABCDEF42ULL ||
+        !registers.getRegisterValue("ax", value) || value != 0xEF42 ||
+        !registers.getRegisterValue("ah", value) || value != 0xEF ||
+        !registers.getRegisterValue("al", value) || value != 0x42 ||
+        !registers.getRegisterValue("rax", value) || value != 0x12345678ABCDEF42ULL ||
+        registers.getRegisterValue("unknown", value)) {
+        std::cerr << "Register views returned incorrect values\n";
+        return false;
+    }
+    unsigned code = 0;
+    const auto* cx = registers.getRegisterByName("cx");
+    const auto* ah = registers.getRegisterByName("ah");
+    const auto* r15b = registers.getRegisterByName("r15b");
+    if (!cx || !cx->getEncodingId("cx", code) || code != 1 ||
+        !ah || !ah->getEncodingId("ah", code) || code != 4 ||
+        !r15b || !r15b->getEncodingId("r15b", code) || code != 15) {
+        std::cerr << "Register encoding IDs are incorrect\n";
+        return false;
+    }
+    const Cpu& generic = cpu;
+    if (generic.registers().getRegisterByName("al") != rax) {
+        std::cerr << "CPU interface did not expose the x86 register file\n";
+        return false;
+    }
+    X86 other;
+    if (!other.registers().getRegisterValue("rax", value) || value != 0) {
+        std::cerr << "CPU register files share state\n";
+        return false;
+    }
+    return true;
+}
+
 bool test_near_modes() {
     X86 cpu;
     for (const X86Mode mode : {X86Mode::Bits16, X86Mode::Bits32, X86Mode::Bits64}) {
@@ -78,6 +123,7 @@ bool test_near_modes() {
 }
 
 int main() {
+    if (!test_register_file()) return 1;
     if (!test_near_modes()) return 1;
     X86 x86;
     std::uint8_t byte = 0;
@@ -93,6 +139,49 @@ int main() {
     }
     std::vector<std::vector<std::uint8_t>> bytes;
     std::string error;
+    x86.setMode(X86Mode::Bits16);
+    for (const auto& reg : {std::pair<const char*, std::uint8_t>{"ax", 0xB8},
+                            {"cx", 0xB9}, {"dx", 0xBA}, {"bx", 0xBB},
+                            {"sp", 0xBC}, {"bp", 0xBD}, {"si", 0xBE}, {"di", 0xBF}}) {
+        for (std::uint64_t value : {0u, 0x1234u, 0xFFFFu}) {
+            bytes.clear();
+            error.clear();
+            if (!x86.encoder()->encode_immediate("mov", reg.first, value, bytes, error)) {
+                std::cerr << "mov " << reg.first << " immediate failed: " << error << '\n';
+                return 1;
+            }
+            std::vector<std::uint8_t> encoded;
+            for (const auto& part : bytes)
+                encoded.insert(encoded.end(), part.begin(), part.end());
+            if (encoded != std::vector<std::uint8_t>{reg.second, static_cast<std::uint8_t>(value),
+                                                     static_cast<std::uint8_t>(value >> 8)}) {
+                std::cerr << "mov " << reg.first << " immediate produced incorrect bytes\n";
+                return 1;
+            }
+        }
+    }
+    bytes.clear();
+    if (x86.encoder()->encode_immediate("mov", "ax", 0x10000, bytes, error) || !bytes.empty()) {
+        std::cerr << "x86 accepted an out-of-range 16-bit immediate\n";
+        return 1;
+    }
+    for (const auto& reg : {std::pair<const char*, std::uint8_t>{"al", 0xB0},
+                            {"cl", 0xB1}, {"dl", 0xB2}, {"bl", 0xB3},
+                            {"ah", 0xB4}, {"ch", 0xB5}, {"dh", 0xB6}, {"bh", 0xB7}}) {
+        bytes.clear();
+        if (!x86.encoder()->encode_immediate("mov", reg.first, 0x42, bytes, error) ||
+            bytes != std::vector<std::vector<std::uint8_t>>{{reg.second}, {0x42}}) {
+            std::cerr << "mov " << reg.first << " immediate encoded incorrectly\n";
+            return 1;
+        }
+    }
+    for (const char* reg : {"eax", "spl", "r8w", "r8b"}) {
+        bytes.clear();
+        if (x86.encoder()->encode_immediate("mov", reg, 0, bytes, error) || !bytes.empty()) {
+            std::cerr << "x86 accepted unsupported register " << reg << '\n';
+            return 1;
+        }
+    }
     for (std::uint64_t value : {0u, 42u, 255u}) {
         bytes.clear();
         if (!x86.encoder()->encode_immediate("mov", "al", value, bytes, error)) {

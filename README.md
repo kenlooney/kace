@@ -42,6 +42,10 @@ assembly concepts.
 - Assembly-time output-position assertions with `#assertposition`
 - CPU plugins with assembler and optional disassembler contracts,
   and an x86 plugin that encodes `nop`, short jumps, mode-aware near jumps, and 16-bit far jumps
+- Architecture-neutral register files and x86 register families with named,
+  overlapping views and encoding IDs
+- x86 plugin API encoding of immediate moves to 8-bit and 16-bit registers
+  in 16-bit mode
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
 - Label recognition, offset recording, and short- and near-jump fixups, plus a symbol
   table with save/load helpers
@@ -178,8 +182,11 @@ KASM also accepts `jmp near label` (and its `jump` and `goto` aliases). In the
 CLI's default 16-bit x86 mode, the `E9` near jump is three bytes with a signed
 16-bit displacement, from -32768 through 32767, relative to the instruction's
 end. Through the x86 plugin's C++ API, 32- and 64-bit modes use a five-byte
-`E9` form with a signed 32-bit displacement. Encoding, decoding, and label
-fixups use the active mode. The CLI does not yet provide a way to change it.
+`E9` form with a signed 32-bit displacement. Near-jump label fixups use the
+mode selected for each jump. Source statements `code16`, `code32`, and
+`code64` change the mode used for subsequent near-jump assembly. These
+statements do not emit bytes. Disassembly uses the plugin's selected mode;
+the binary does not record source mode changes.
 
 KASM also assembles far jumps such as `jmp far 0x1234:0x5678`, with integer
 literals for the segment and offset. The `jump` and `goto` aliases work here
@@ -210,15 +217,35 @@ The original spelling is not preserved in the binary.
 The CPU interface exposes a plugin-provided assembler and an optional
 disassembler. The x86 plugin keeps its instruction encoders, decoders, and
 jump fixups inside the plugin. The shared statement model is still evolving.
-The x86 plugin also stores a 16-, 32-, or 64-bit mode, defaulting to 16-bit;
-mode selection is not yet connected to the CLI.
+The x86 plugin also stores a 16-, 32-, or 64-bit mode, defaulting to 16-bit.
 
-The parser accepts immediate `mov` expressions,
-and the x86 plugin can encode `mov al` with an 8-bit immediate, but that
-encoding is not yet connected to the CLI's output path. Similarly, the x86
-plugin can decode `nop`, `mov al, immediate`, short jumps, mode-aware near jumps,
-and 16-bit far jumps. To disassemble
-an existing binary into a text file, run:
+### Registers and immediate moves
+
+The framework exposes a CPU's `RegisterFile` through the `Cpu` interface.
+Plugins can define architecture-specific register information without putting
+x86 encoding rules into the generic register types. The x86 plugin groups
+overlapping names such as `rax`, `eax`, `ax`, `al`, and `ah`; each alias
+describes its width and position within the group. Register encoding IDs let
+the encoder distinguish, for example, `al` from `ah`.
+
+Through the x86 plugin's C++ encoder API, 16-bit mode supports `mov` immediate
+to `al`, `cl`, `dl`, `bl`, `ah`, `ch`, `dh`, and `bh`, as well as `ax`,
+`cx`, `dx`, `bx`, `sp`, `bp`, `si`, and `di`. The 8-bit form uses opcode
+`B0` plus the register ID and one immediate byte; the 16-bit form uses `B8`
+plus the register ID and two immediate bytes in little-endian order. For
+example, `mov cx, 0x1234` encodes as `B9 34 12`, and `mov ah, 0x42` as
+`B4 42`. The encoder rejects values that do not fit and registers unavailable
+in 16-bit mode.
+
+These examples describe the encoder API, not a complete CLI assembly workflow:
+the parser accepts immediate `mov` statements, but the x86 assembler does not
+yet connect them to this encoder. The decoder currently supports the `mov al`
+immediate form, not the other immediate register forms. Expanding CLI assembly
+and decoding remains future work.
+
+The x86 plugin can decode `nop`, `mov al, immediate`, short jumps, mode-aware
+near jumps, and 16-bit far jumps. To disassemble an existing binary into a text
+file, run:
 
 ```powershell
 .\bin\Debug\kasm.exe --disassemble -i example.bin
@@ -263,8 +290,9 @@ The test suite covers source loading, diagnostics, lexing, expression and
 statement parsing, CLI output, CPU plugins, x86 encoding and decoding, and
 symbol table persistence. The CLI tests also cover jumps, position-based
 padding, nested includes, and position assertions, including failure cases. The
-x86 plugin tests cover near-jump widths, range limits, and fixups in all three
-modes. Use CTest's `-V` option to show output
+x86 plugin tests cover register aliases, 8- and 16-bit immediate encodings in
+16-bit mode, near-jump widths, range limits, and fixups in all three modes.
+Use CTest's `-V` option to show output
 from passing tests, or select a test in CMake Tools' Test Explorer.
 
 ## Repository Layout
@@ -285,7 +313,7 @@ Planned development includes:
 
 - Output for word, double-word, and quad-word data definitions
 - Far-jump support in additional CPU modes and broader label resolution
-- CLI CPU mode selection and mode-aware support for more instructions
+- Mode-aware support for more instructions and disassembly mode selection
 - Connecting immediate encoding to the CLI and expanding disassembly
 - More instructions, registers, and addressing modes
 - A complete KASM command-line workflow
