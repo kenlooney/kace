@@ -24,11 +24,30 @@ enum class MoveKind
     RegisterToMemory,
     None,
 };
-struct KasmStatement : public Statement
+class KasmStatement : public Statement
 {
+public:
     std::string sourceName;
     std::size_t line = 0;
     DataType type = DataType::None;
     std::uint64_t value = 0;
     MoveKind moveKind = MoveKind::None;
+    Expression expression;
+    std::string reg;
+    DirectiveKind directiveKind = DirectiveKind::None;
+    DirectiveStage directiveStage = DirectiveStage::SourceExpansion;
+    std::string includePath;
+    std::uint64_t assertPosition = 0;
+    std::string target;
+    std::uint64_t farSegment = 0;
+    std::uint64_t farOffset = 0;
+    std::string codeSegment;
+    std::size_t offset = 0;
+    std::uint64_t count = 0;
+    Expression countExpression;
+    bool parse_statement(const std::vector<Token> &tokens, std::string &error) override
+    {
+        return false;
+    }
+
 };

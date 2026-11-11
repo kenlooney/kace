@@ -47,14 +47,14 @@ int main(int argc, char *argv[])
 
     for (const auto& statementPtr : statements) {
         const Statement& statement = *statementPtr;
-        if (statement.kind == StatementKind::Label) continue;
+        if (statement.has_kind("Label")) continue;
         std::uint8_t byte = 0;
         const auto* kasmStatement = dynamic_cast<const KasmStatement*>(statementPtr.get());
         if (!kasmStatement || !check_kasm_byte(*kasmStatement, byte, error)) {
             std::cerr << error << "\n";
             return 1;
         }
-        std::cout << "line " << statement.line
+        std::cout << "line " << kasmStatement->line
                   << ": Checked byte: "
                   << static_cast<unsigned>(byte) << "\n";
     }

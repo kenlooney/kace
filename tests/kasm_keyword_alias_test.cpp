@@ -37,7 +37,7 @@ int main() {
         const Statement& statement = *statementPtr;
         const auto* kasmStatement = dynamic_cast<const KasmStatement*>(statementPtr.get());
         if (!kasmStatement || kasmStatement->moveKind != MoveKind::ImmediateToRegister ||
-            statement.name != "mov" || statement.reg != "ax" || statement.value != 12) {
+            statement.name() != "mov" || kasmStatement->reg != "ax" || kasmStatement->value != 12) {
             std::cerr << "mov alias did not parse as mov\n";
             return 1;
         }
@@ -51,26 +51,30 @@ int main() {
     }
     source.text = "jmp short done\njump short done\ngoto short done\n";
     if (!parser.parse(source, statements, error) || statements.size() != 3 ||
-        statements[0]->kind != StatementKind::JumpShort ||
-        statements[1]->kind != StatementKind::JumpShort ||
-        statements[2]->kind != StatementKind::JumpShort) {
+        !statements[0]->has_kind("JumpShort") ||
+        !statements[1]->has_kind("JumpShort") ||
+        !statements[2]->has_kind("JumpShort")) {
         std::cerr << "Jump kinds or aliases did not parse correctly: " << error << '\n';
         return 1;
     }
     for (const auto& statementPtr : statements) {
         const Statement& statement = *statementPtr;
-        if (statement.name != "jmp" || statement.target != "done") return 1;
+        const auto* kasmStatement = dynamic_cast<const KasmStatement*>(statementPtr.get());
+        if (!kasmStatement || statement.name() != "jmp" || kasmStatement->target != "done") return 1;
     }
     source.text = "jmp near done";
     if (!parser.parse(source, statements, error) || statements.size() != 1 ||
-        statements[0]->kind != StatementKind::JumpNear || statements[0]->target != "done") {
+        !statements[0]->has_kind("JumpNear") || (dynamic_cast<const KasmStatement*>(statements[0].get()) == nullptr ||
+         dynamic_cast<const KasmStatement*>(statements[0].get())->target != "done")) {
         std::cerr << "Near jump did not parse correctly\n";
         return 1;
     }
     source.text = "jmp far 0x1234:0b1010";
     if (!parser.parse(source, statements, error) || statements.size() != 1 ||
-        statements[0]->kind != StatementKind::JumpFar ||
-        statements[0]->farSegment != 0x1234 || statements[0]->farOffset != 10) {
+        !statements[0]->has_kind("JumpFar") ||
+        (dynamic_cast<const KasmStatement*>(statements[0].get()) == nullptr ||
+         dynamic_cast<const KasmStatement*>(statements[0].get())->farSegment != 0x1234 ||
+         dynamic_cast<const KasmStatement*>(statements[0].get())->farOffset != 10)) {
         std::cerr << "Far jump did not parse correctly: " << error << '\n';
         return 1;
     }

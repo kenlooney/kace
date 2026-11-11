@@ -44,6 +44,8 @@ assembly concepts.
   and an x86 plugin that encodes `nop`, short jumps, mode-aware near jumps, and 16-bit far jumps
 - Architecture-neutral register files and x86 register families with named,
   overlapping views and encoding IDs
+- An inheritable statement interface and named statement kinds, with KASM's
+  statement data stored in its own derived class
 - x86 plugin API encoding and decoding of supported register-immediate moves,
   including mode-aware operand sizes
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
@@ -216,8 +218,32 @@ The original spelling is not preserved in the binary.
 
 The CPU interface exposes a plugin-provided assembler and an optional
 disassembler. The x86 plugin keeps its instruction encoders, decoders, and
-jump fixups inside the plugin. The shared statement model is still evolving.
-The x86 plugin also stores a 16-, 32-, or 64-bit mode, defaulting to 16-bit.
+jump fixups inside the plugin. The x86 plugin also stores a 16-, 32-, or
+64-bit mode, defaulting to 16-bit.
+
+### Statements and parser implementations
+
+KACE's `Statement` is a base class with a name and a collection of named
+`StatementKind` objects. Kinds are held by `std::unique_ptr`, allowing a
+derived kind to retain its own data without being sliced. A statement can
+have multiple kinds, and `has_kind()` checks their names.
+
+KASM defines `KasmStatement`, which derives from `Statement` and holds its
+own expression, register, directive, jump, mode, and source-location data.
+The parser creates these derived objects and passes them through the shared
+assembler contract as `std::unique_ptr<Statement>`. Include expansion keeps
+the same ownership model. The x86 assembler checks that each statement is a
+`KasmStatement` before accessing KASM-specific fields; it currently depends
+on `kasmcore` and is not a language-independent statement consumer.
+
+Another language implementation can define a different `Statement` subclass
+and have its parser construct it. A concrete subclass must override the base
+class's pure virtual `parse_statement()` function. Currently,
+`KasmStatement::parse_statement()` is a placeholder that returns `false`;
+`KasmParser::parse()` still performs KASM's actual parsing. How that work
+should be divided is an open part of the design. Assemblers consuming other
+statement types need to handle those types explicitly, and plugins must be
+rebuilt against the matching framework interface.
 
 ### Registers and immediate moves
 
@@ -247,10 +273,11 @@ are not yet supported by this decoder. The encoder's 64-bit branch is still
 in progress: its width lookup does not yet recognize primary names such as
 `rax`.
 
-These examples describe the encoder API, not a complete CLI assembly workflow:
-the parser accepts immediate `mov` statements, but the x86 assembler does not
-yet connect them to this encoder. Connecting CLI assembly and expanding
-instruction and prefix support remain future work.
+The x86 assembler also calls this encoder for parsed immediate `mov`
+statements. For example, `mov cx, 0x1234` in the default 16-bit mode produces
+`B9 34 12` through the KASM CLI. Register-to-register and memory move forms
+are not yet implemented. Expanding instruction, register, and prefix support
+remains future work.
 
 The x86 plugin can decode `nop`, supported register-immediate moves, short jumps, mode-aware
 near jumps, and 16-bit far jumps. To disassemble an existing binary into a text
@@ -324,7 +351,8 @@ Planned development includes:
 - Output for word, double-word, and quad-word data definitions
 - Far-jump support in additional CPU modes and broader label resolution
 - Mode-aware support for more instructions and disassembly mode selection
-- Connecting immediate encoding to the CLI and expanding disassembly
+- Register-to-register and memory moves, and broader disassembly support
+- Completing the statement parsing contract and refining plugin language boundaries
 - More instructions, registers, and addressing modes
 - A complete KASM command-line workflow
 - Stable releases and packaged distributions

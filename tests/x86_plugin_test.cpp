@@ -1,4 +1,5 @@
 #include <x86/x86.hpp>
+#include <kasm/kasmstatement.hpp>
 
 #include <cstdint>
 #include <iostream>
@@ -90,12 +91,21 @@ bool test_near_modes() {
         }
 
         std::vector<std::unique_ptr<Statement>> statements;
-        for (int i = 0; i < 5; ++i) statements.push_back(std::make_unique<Statement>());
-        statements[0]->kind = StatementKind::Label; statements[0]->name = "start";
-        statements[1]->kind = StatementKind::JumpNear; statements[1]->target = "end";
-        statements[2]->name = "nop";
-        statements[3]->kind = StatementKind::Label; statements[3]->name = "end";
-        statements[4]->kind = StatementKind::JumpNear; statements[4]->target = "start";
+        auto start = std::make_unique<KasmStatement>();
+        start->add_kind("Label"); start->set_name("start");
+        statements.push_back(std::move(start));
+        auto forward = std::make_unique<KasmStatement>();
+        forward->add_kind("JumpNear"); forward->target = "end";
+        statements.push_back(std::move(forward));
+        auto nop = std::make_unique<KasmStatement>();
+        nop->set_name("nop");
+        statements.push_back(std::move(nop));
+        auto end = std::make_unique<KasmStatement>();
+        end->add_kind("Label"); end->set_name("end");
+        statements.push_back(std::move(end));
+        auto backward = std::make_unique<KasmStatement>();
+        backward->add_kind("JumpNear"); backward->target = "start";
+        statements.push_back(std::move(backward));
         std::vector<std::uint8_t> assembled;
         SymbolTable symbols;
         std::string error, decoded;

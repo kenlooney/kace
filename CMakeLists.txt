@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(kace VERSION 0.23.0)
+project(kace VERSION 0.24.0)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)

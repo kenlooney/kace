@@ -1,6 +1,6 @@
 #include <iostream>
 #include "kace/source.hpp"
-#include "kace/statement.hpp"
+#include "kasm/kasmstatement.hpp"
 #include "kace/loader.hpp"
 #include "kasm/diagnostic.hpp"
 #include "kasm/kasmparser.hpp"
@@ -227,8 +227,14 @@ bool expandIncludes(const Source &source, std::vector<std::unique_ptr<Statement>
         return false;
     for (auto &statementPtr : parsed)
     {
-        Statement &statement = *statementPtr;
-        if (statement.kind == StatementKind::Directive &&
+        auto *kasmStatement = dynamic_cast<KasmStatement *>(statementPtr.get());
+        if (!kasmStatement)
+        {
+            error = source.name + ": parser returned an invalid KASM statement";
+            return false;
+        }
+        KasmStatement &statement = *kasmStatement;
+        if (statement.has_kind("Directive") &&
             statement.directiveKind == DirectiveKind::Include)
         {
             const auto path = sourcePath.parent_path() / std::filesystem::path(statement.includePath);

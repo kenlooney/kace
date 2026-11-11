@@ -3,7 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <kace/ast.hpp>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 #include <kace/lexer.hpp>
 
@@ -42,6 +44,8 @@ class Statement
 public:
     Statement() = default;
     virtual ~Statement() = default;
+    Statement(Statement&&) = default;
+    Statement& operator=(Statement&&) = default;
 
     void set_name(const std::string &name)
     {
@@ -52,14 +56,20 @@ public:
         return name_;
     }
 
-    const std::vector<StatementKind> &kinds() const
+    const std::vector<std::unique_ptr<StatementKind>> &kinds() const
     {
         return kinds_;
     }
 
-    void add_kind(const StatementKind &kind)
+    void add_kind(std::unique_ptr<StatementKind> kind)
     {
-        kinds_.push_back(kind);
+        if (kind)
+            kinds_.push_back(std::move(kind));
+    }
+
+    void add_kind(const std::string &name)
+    {
+        add_kind(std::make_unique<StatementKind>(name));
     }
     bool has_kind(const StatementKind &kind) const
     {
@@ -69,7 +79,7 @@ public:
     {
         for (const auto &k : kinds_)
         {
-            if (k.name() == name)
+            if (k->name() == name)
             {
                 return true;
             }
@@ -80,7 +90,7 @@ public:
 
 private:
     std::string name_;
-    std::vector<StatementKind> kinds_;
+    std::vector<std::unique_ptr<StatementKind>> kinds_;
 };
 
 // struct Statement {

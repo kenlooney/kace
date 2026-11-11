@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
     std::vector<std::uint8_t> bytes;
     for (const auto& statementPtr : statements) {
         const Statement& statement = *statementPtr;
-        if (statement.kind == StatementKind::Label) continue;
+        if (statement.has_kind("Label")) continue;
         std::uint8_t byte = 0;
         const auto* kasmStatement = dynamic_cast<const KasmStatement*>(statementPtr.get());
         if (!kasmStatement || !check_kasm_byte(*kasmStatement, byte, error)) {
