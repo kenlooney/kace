@@ -1,6 +1,6 @@
 #include "kace/source.hpp"
 #include "kace/statement.hpp"
-#include "kace/semantic.hpp"
+#include "kasm/kasmsemantic.hpp"
 #include "kasm/diagnostic.hpp"
 #include "kasm/kasmparser.hpp"
 #include <iostream>
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     }
     std::vector<Token> no_tokens;
     KasmParser parser(no_tokens);
-    std::vector<Statement> statements;
+    std::vector<std::unique_ptr<Statement>> statements;
     std::string error;
     if (!parser.parse(source, statements, error)) {
         std::cerr << error << "\n";
@@ -45,14 +45,16 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    for (const Statement& statement : statements) {
-        if (statement.kind == StatementKind::Label) continue;
+    for (const auto& statementPtr : statements) {
+        const Statement& statement = *statementPtr;
+        if (statement.has_kind("Label")) continue;
         std::uint8_t byte = 0;
-        if (!check_byte(statement, byte, error)) {
+        const auto* kasmStatement = dynamic_cast<const KasmStatement*>(statementPtr.get());
+        if (!kasmStatement || !check_kasm_byte(*kasmStatement, byte, error)) {
             std::cerr << error << "\n";
             return 1;
         }
-        std::cout << "line " << statement.line
+        std::cout << "line " << kasmStatement->line
                   << ": Checked byte: "
                   << static_cast<unsigned>(byte) << "\n";
     }

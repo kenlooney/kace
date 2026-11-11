@@ -15,7 +15,10 @@
  */
 #include <x86/x86.hpp>
 
-
+X86Mode X86Decoder::mode() const
+{
+    return cpu_.getMode();
+}
 
 // Decoding
 bool X86Decoder::decode(
@@ -31,7 +34,25 @@ bool X86Decoder::decode(
     case 0x90:
         return decode_no_operand(bytes, offset, text);
     case 0xB0:
+    case 0xB1:
+    case 0xB2:
+    case 0xB3:
+    case 0xB4:
+    case 0xB5:
+    case 0xB6:
+    case 0xB7:
+    case 0xB8:
+    case 0xB9:
+    case 0xBA:
+    case 0xBB:
+    case 0xBC:
+    case 0xBD:
+    case 0xBE:
+    case 0xBF:
+    case 0x66:
         return decode_immediate(bytes, offset, text);
+    case 0x48:
+        return mode() == X86Mode::Bits64 && decode_immediate(bytes, offset, text);
     case 0xEB:
         return decode_short_jump(bytes, offset, text);
     case 0xE9:
@@ -60,18 +81,129 @@ bool X86Decoder::decode_no_operand(const std::vector<std::uint8_t> &bytes, std::
 
 bool X86Decoder::decode_immediate(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
-    if (offset + 1 >= bytes.size())
+    if (offset >= bytes.size() || bytes.size() - offset < 2)
         return false;
 
-    if (bytes[offset] == 0xB0)
+    // 16-, 32-, and 64-bit register immediate decoding
+    std::size_t opcode_offset = offset;
+    unsigned width = 0;
+    if (bytes[opcode_offset] == 0x66)
+    {
+        if (mode() == X86Mode::Bits16)
+            width = 32;
+        else if (mode() == X86Mode::Bits32 || mode() == X86Mode::Bits64)
+            width = 16;
+        else
+            return false;
+        ++opcode_offset;
+    }
+    else if (bytes[opcode_offset] == 0x48 && mode() == X86Mode::Bits64)
+    {
+        width = 64;
+        ++opcode_offset;
+    }
+
+    const std::uint8_t opcode = bytes[opcode_offset];
+    if (opcode >= 0xB8 && opcode <= 0xBF)
+    {
+        if (width == 0)
+        {
+            if (mode() == X86Mode::Bits16)
+                width = 16;
+            else if (mode() == X86Mode::Bits32 || mode() == X86Mode::Bits64)
+                width = 32;
+            else
+                return false;
+        }
+        const std::size_t immediate_size = width / 8;
+        if (bytes.size() - opcode_offset - 1 < immediate_size)
+            return false;
+
+        static const char* const names16[] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"};
+        static const char* const names32[] = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"};
+        static const char* const names64[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi"};
+        const char* const* names = width == 16 ? names16 : width == 32 ? names32 : names64;
+        std::uint64_t value = 0;
+        for (std::size_t i = 0; i < immediate_size; ++i)
+            value |= static_cast<std::uint64_t>(bytes[opcode_offset + 1 + i]) << (8 * i);
+        text = std::string("mov ") + names[opcode - 0xB8] + ", " + std::to_string(value);
+        offset = opcode_offset + 1 + immediate_size;
+        return true;
+    }
+    if (opcode_offset != offset)
+        return false;
+
+    // 8-bit register immediate decoding
+    switch (bytes[offset])
+    {
+    case 0xB0:
     {
         std::uint8_t value = bytes[offset + 1];
         offset += 2;
         text = "mov al, " + std::to_string(value);
         return true;
     }
+    break;
+    case 0xB1:
+    {
+        std::uint8_t value = bytes[offset + 1];
+        offset += 2;
+        text = "mov cl, " + std::to_string(value);
+        return true;
+    }
+    break;
+    case 0xB2:
+    {
+        std::uint8_t value = bytes[offset + 1];
+        offset += 2;
+        text = "mov dl, " + std::to_string(value);
+        return true;
+    }
+    break;
+    case 0xB3:
+    {
+        std::uint8_t value = bytes[offset + 1];
+        offset += 2;
+        text = "mov bl, " + std::to_string(value);
+        return true;
+    }
+    break;
+    case 0xB4:
+    {
+        std::uint8_t value = bytes[offset + 1];
+        offset += 2;
+        text = "mov ah, " + std::to_string(value);
+        return true;
+    }
+    break;
+    case 0xB5:
+    {
+        std::uint8_t value = bytes[offset + 1];
+        offset += 2;
+        text = "mov ch, " + std::to_string(value);
+        return true;
+    }
+    break;
+    case 0xB6:
+    {
+        std::uint8_t value = bytes[offset + 1];
+        offset += 2;
+        text = "mov dh, " + std::to_string(value);
+        return true;
+    }
+    break;
+    case 0xB7:
+    {
+        std::uint8_t value = bytes[offset + 1];
+        offset += 2;
+        text = "mov bh, " + std::to_string(value);
+        return true;
+    }
+    break;
 
-    return false;
+    default:
+        return false;
+    }
 }
 bool X86Decoder::decode_short_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
@@ -84,7 +216,7 @@ bool X86Decoder::decode_short_jump(const std::vector<std::uint8_t> &bytes, std::
 }
 
 bool X86Decoder::short_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
-                                  std::int64_t &displacement) const
+                                         std::int64_t &displacement) const
 {
     if (offset >= bytes.size() || bytes.size() - offset < 2 || bytes[offset] != 0xEB)
         return false;
@@ -94,8 +226,9 @@ bool X86Decoder::short_jump_displacement(const std::vector<std::uint8_t> &bytes,
 }
 
 bool X86Decoder::near_jump_displacement(
-    const std::vector<std::uint8_t>& bytes, std::size_t offset,
-    std::int64_t& displacement) const {
+    const std::vector<std::uint8_t> &bytes, std::size_t offset,
+    std::int64_t &displacement) const
+{
     const std::size_t size = near_displacement_size(cpu_.getMode());
     if (size == 0 || offset >= bytes.size() ||
         bytes[offset] != 0xE9 || bytes.size() - offset - 1 < size)
@@ -112,8 +245,9 @@ bool X86Decoder::near_jump_displacement(
 }
 
 bool X86Decoder::decode_near_jump(
-    const std::vector<std::uint8_t>& bytes, std::size_t& offset,
-    std::string& text) const {
+    const std::vector<std::uint8_t> &bytes, std::size_t &offset,
+    std::string &text) const
+{
     std::int64_t displacement = 0;
     if (!near_jump_displacement(bytes, offset, displacement))
         return false;
@@ -122,10 +256,9 @@ bool X86Decoder::decode_near_jump(
     return true;
 }
 
-
 bool X86Decoder::decode_far_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
-    if(cpu_.getMode() != X86Mode::Bits16 || offset >= bytes.size() || bytes.size() - offset < 5)
+    if (cpu_.getMode() != X86Mode::Bits16 || offset >= bytes.size() || bytes.size() - offset < 5)
         return false;
     if (bytes[offset] == 0xEA)
     {

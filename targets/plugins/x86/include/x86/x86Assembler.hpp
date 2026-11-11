@@ -10,7 +10,7 @@ struct X86JumpFixup : public JumpFixup {
 class X86Assembler : public Assembler {
 public:
     explicit X86Assembler(X86& cpu) : cpu_(cpu) {}
-    bool assemble(const std::vector<Statement>& statements,
+    bool assemble(const std::vector<std::unique_ptr<Statement>>& statements,
                   std::vector<std::uint8_t>& bytes,
                   SymbolTable& symbols, std::string& error) const override;
 private:

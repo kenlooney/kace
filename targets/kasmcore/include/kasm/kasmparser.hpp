@@ -1,3 +1,5 @@
+#include <kasm/kasmstatement.hpp>
+#include <memory>
 /*
  * Copyright (C) 2026 Kenneth Looney
  *
@@ -61,7 +63,7 @@ public:
 
     bool parse(
         const Source &source,
-        std::vector<Statement> &statements,
+        std::vector<std::unique_ptr<Statement>> &statements,
         std::string &error)
     {
         statements.clear();
@@ -80,7 +82,7 @@ public:
                 continue;
             }
 
-            Statement statement;
+            KasmStatement statement;
             statement.line = line_number;
             statement.sourceName = source.name;
 
@@ -95,9 +97,9 @@ public:
                             ": Unexpected tokens after code segment declaration";
                     return false;
                 }
-                statement.kind = StatementKind::CodeSegment;
+                statement.add_kind("CodeSegment");
                 statement.codeSegment = tokens[0].text;
-                statements.push_back(statement);
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
             
@@ -110,22 +112,22 @@ public:
                             ": Expected a directive name after #";
                     return false;
                 }
-                statement.kind = StatementKind::Directive;
-                std::string directive = statement.name = tokens[1].text;
+                statement.add_kind("Directive");
+                statement.set_name(tokens[1].text);
 
                 if (tokens[1].kind != "identifier" ||
-                    (directive != "include" &&
-                     directive != "assertposition"))
+                    (statement.name() != "include" &&
+                     statement.name() != "assertposition"))
                 {
                     error = source.name + ":" +
                             std::to_string(line_number) +
-                            ": Unknown directive " + directive;
+                            ": Unknown directive " + statement.name();
                     return false;
                 }
 
-                if (directive == "include")
+                if (statement.name() == "include")
                 {
-                    statement.name = "include";
+                    statement.set_name("include");
                     statement.directiveKind = DirectiveKind::Include;
                     statement.directiveStage = DirectiveStage::SourceExpansion;
 
@@ -145,7 +147,7 @@ public:
                     std::string include_path = tokens[2].text;
                     statement.includePath = include_path;
                 }
-                else if (directive == "assertposition")
+                else if (statement.name() == "assertposition")
                 {
                     if (tokens.size() != 3) // If token count is not exactly 3, it's an error because the position is not included
                     {
@@ -161,7 +163,7 @@ public:
                     }
 
                    
-                    statement.name = "assertposition";
+                    statement.set_name("assertposition");
                     statement.directiveKind = DirectiveKind::AssertPosition;
                     statement.directiveStage = DirectiveStage::Assembly;
                      
@@ -176,7 +178,7 @@ public:
 
                 }
 
-                statements.push_back(statement);
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
 
@@ -184,9 +186,9 @@ public:
             if (tokens[0].kind == "label")
             {
 
-                statement.kind = StatementKind::Label;
-                statement.name = tokens[0].text.substr(0, tokens[0].text.size() - 1);
-                statements.push_back(statement);
+                statement.add_kind("Label");
+                statement.set_name(tokens[0].text.substr(0, tokens[0].text.size() - 1));
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
 
@@ -198,23 +200,23 @@ public:
                 return false;
             }
 
-            statement.name = tokens[0].text;
+            statement.set_name(tokens[0].text);
 
             for (const Alias &keyword : keywords_table.aliases())
             {
-                if (statement.name == keyword.symbol)
+                if (statement.name() == keyword.symbol)
                 {
                     break;
                 }
                 for (const std::string &alias : keyword.values)
                 {
-                    if (statement.name == alias)
+                    if (statement.name() == alias)
                     {
-                        statement.name = keyword.symbol;
+                        statement.set_name(keyword.symbol);
                         break;
                     }
                 }
-                if (statement.name == keyword.symbol)
+                if (statement.name() == keyword.symbol)
                 {
                     break;
                 }
@@ -223,10 +225,10 @@ public:
             std::size_t operand_start = 1;
             std::size_t operand_end = tokens.size();
 
-            if (statement.name == "times")
+            if (statement.name() == "times")
             {
 
-                statement.kind = StatementKind::Times;
+                statement.add_kind("Times");
                 std::size_t byte_index = 1;
                 std::string data_directive;
                 while (byte_index < tokens.size())
@@ -277,8 +279,9 @@ public:
                 statement.type = DataType::Byte;
             }
 
-            if (statement.name == "mov")
+            if (statement.name() == "mov")
             {
+                statement.moveKind = MoveKind::ImmediateToRegister;
                 // move/copy/mov <expression> into <register>
                 if (tokens.size() < 4)
                 {
@@ -305,7 +308,7 @@ public:
                     return false;
                 }
             }
-            if (statement.name == "jmp")
+            if (statement.name() == "jmp")
             {
                 if (tokens.size() < 2)
                 {
@@ -326,8 +329,8 @@ public:
                                 ": Expected a far jump segment:offset";
                         return false;
                     }
-                    statement.kind = StatementKind::JumpFar;
-                    statements.push_back(statement);
+                    statement.add_kind("JumpFar");
+                    statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                     continue;
                 }
                 if (tokens.size() != 3 || tokens[2].kind != "identifier")
@@ -337,9 +340,9 @@ public:
                     return false;
                 }
                 if (type == "short")
-                    statement.kind = StatementKind::JumpShort;
+                    statement.add_kind("JumpShort");
                 else if (type == "near")
-                    statement.kind = StatementKind::JumpNear;
+                    statement.add_kind("JumpNear");
                 else
                 {
                     error = source.name + ":" +
@@ -348,13 +351,13 @@ public:
                     return false;
                 }
                 statement.target = tokens[2].text;
-                statements.push_back(statement);
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
 
-            if (statement.name == "define")
+            if (statement.name() == "define")
             {
-                statement.kind = StatementKind::Directive;
+                statement.add_kind("Directive");
                 if (tokens.size() < 3 || tokens[1].kind != "identifier")
                 {
                     error = source.name + ":" +
@@ -389,7 +392,7 @@ public:
                 }
                 operand_start = 2;
             }
-            else if (statement.name == "db")
+            else if (statement.name() == "db")
             {
                 statement.type = DataType::Byte;
             }
@@ -399,7 +402,7 @@ public:
                 tokens.begin() + operand_end);
             if (operands.empty() && statement.type == DataType::None)
             {
-                statements.push_back(statement);
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
             KasmParser line_parser(operands);
@@ -413,7 +416,7 @@ public:
                 return false;
             }
 
-            statements.push_back(statement);
+            statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
         }
 
         return true;

@@ -2,13 +2,14 @@
 #include <x86/x86.hpp>
 #include <kace/fixup.hpp>
 #include <kace/parser.hpp>
-#include <kace/semantic.hpp>
+#include "kasm/kasmstatement.hpp"
+#include <kasm/kasmsemantic.hpp>
 #include <algorithm>
 #include <limits>
 #include <iostream>
 #include <x86/mode.hpp>
 
-bool X86Assembler::assemble(const std::vector<Statement> &statements,
+bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &statements,
                             std::vector<std::uint8_t> &bytes,
                             SymbolTable &symbols, std::string &error) const
 {
@@ -20,16 +21,23 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
     std::vector<std::uint8_t> output;
     SymbolTable labels;
     std::vector<X86JumpFixup> fixups;
-    auto fail = [&](const Statement &statement, const std::string &message)
+    auto fail = [&](const KasmStatement &statement, const std::string &message)
     {
         error = statement.sourceName + ":" + std::to_string(statement.line) + ": " + message;
         return false;
     };
-    for (const Statement &statement : statements)
+    for (const auto &statementPtr : statements)
     {
+        const auto *kasmStatement = dynamic_cast<const KasmStatement *>(statementPtr.get());
+        if (!kasmStatement)
+        {
+            error = "x86 assembler expected a KASM statement";
+            return false;
+        }
+        const KasmStatement &statement = *kasmStatement;
         const std::size_t offset = output.size();
 
-        if (statement.kind == StatementKind::CodeSegment)
+        if (statement.has_kind("CodeSegment"))
         {
             std::string segment = statement.codeSegment;
             if (segment.empty())
@@ -47,7 +55,7 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
             continue;
         }
 
-        if (statement.kind == StatementKind::Directive &&
+        if (statement.has_kind("Directive") &&
             statement.directiveStage == DirectiveStage::Assembly &&
             statement.directiveKind == DirectiveKind::AssertPosition)
         {
@@ -55,16 +63,16 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
                 return fail(statement, "Assert position failed: expected " + std::to_string(statement.assertPosition) + ", got " + std::to_string(offset));
             continue;
         }
-        if (statement.kind == StatementKind::Label)
+        if (statement.has_kind("Label"))
         {
-            if (!labels.addLabel(statement.name, offset))
-                return fail(statement, "Duplicate label: " + statement.name);
+            if (!labels.addLabel(statement.name(), offset))
+                return fail(statement, "Duplicate label: " + statement.name());
             continue;
         }
 
-        if (statement.kind == StatementKind::JumpShort || statement.kind == StatementKind::JumpNear)
+        if (statement.has_kind("JumpShort") || statement.has_kind("JumpNear"))
         {
-            const bool near = statement.kind == StatementKind::JumpNear;
+            const bool near = statement.has_kind("JumpNear");
             const std::size_t displacementSize = near ? near_displacement_size(current_mode) : 1;
 
             if (displacementSize == 0)
@@ -77,7 +85,7 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
             continue;
         }
 
-        if (statement.kind == StatementKind::JumpFar)
+        if (statement.has_kind("JumpFar"))
         {
             std::vector<std::uint8_t> encoded;
             if (!cpu_.encoder()->encode_far_jump(statement.farSegment, statement.farOffset, encoded, error))
@@ -85,10 +93,35 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
             output.insert(output.end(), encoded.begin(), encoded.end());
             continue;
         }
-        std::uint8_t byte = 0;
-        if (statement.kind == StatementKind::Times)
+        if (statement.name() == "mov")
         {
-            if (!check_byte(statement, byte, error))
+            Parser evaluator(std::vector<Token>{});
+            PositionContext positions{offset, 0};
+            std::uint64_t value = 0;
+
+            if (!evaluator.evaluate(statement.expression, statement.expression.root,
+                                    value, error, &positions))
+            {
+                return fail(statement, error);
+            }
+            cpu_.setMode(current_mode);
+            std::vector<std::vector<std::uint8_t>> encoded;
+
+            if (!cpu_.encoder()->encode_immediate(
+                    statement.name(), statement.reg, value, encoded, error))
+            {
+                return fail(statement, error);
+            }
+            for (const auto &part : encoded)
+            {
+                output.insert(output.end(), part.begin(), part.end());
+            }
+            continue;
+        }
+        std::uint8_t byte = 0;
+        if (statement.has_kind("Times"))
+        {
+            if (!check_kasm_byte(*kasmStatement, byte, error))
                 return fail(statement, error);
             Parser evaluator(std::vector<Token>{});
             PositionContext positions{offset, 0};
@@ -102,12 +135,12 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
         }
         if (statement.type != DataType::None)
         {
-            if (!check_byte(statement, byte, error))
+            if (!check_kasm_byte(*kasmStatement, byte, error))
                 return fail(statement, error);
         }
-        else if (!statement.expression.nodes.empty() || !cpu_.encoder()->encode_no_operand(statement.name, byte))
+        else if (!statement.expression.nodes.empty() || !cpu_.encoder()->encode_no_operand(statement.name(), byte))
         {
-            return fail(statement, "Unsupported instruction or operands: " + statement.name);
+            return fail(statement, "Unsupported instruction or operands: " + statement.name());
         }
         output.push_back(byte);
     }

@@ -1,4 +1,5 @@
 #include <x86/x86.hpp>
+#include <kasm/kasmstatement.hpp>
 
 #include <cstdint>
 #include <iostream>
@@ -89,12 +90,22 @@ bool test_near_modes() {
             }
         }
 
-        std::vector<Statement> statements(5);
-        statements[0].kind = StatementKind::Label; statements[0].name = "start";
-        statements[1].kind = StatementKind::JumpNear; statements[1].target = "end";
-        statements[2].name = "nop";
-        statements[3].kind = StatementKind::Label; statements[3].name = "end";
-        statements[4].kind = StatementKind::JumpNear; statements[4].target = "start";
+        std::vector<std::unique_ptr<Statement>> statements;
+        auto start = std::make_unique<KasmStatement>();
+        start->add_kind("Label"); start->set_name("start");
+        statements.push_back(std::move(start));
+        auto forward = std::make_unique<KasmStatement>();
+        forward->add_kind("JumpNear"); forward->target = "end";
+        statements.push_back(std::move(forward));
+        auto nop = std::make_unique<KasmStatement>();
+        nop->set_name("nop");
+        statements.push_back(std::move(nop));
+        auto end = std::make_unique<KasmStatement>();
+        end->add_kind("Label"); end->set_name("end");
+        statements.push_back(std::move(end));
+        auto backward = std::make_unique<KasmStatement>();
+        backward->add_kind("JumpNear"); backward->target = "start";
+        statements.push_back(std::move(backward));
         std::vector<std::uint8_t> assembled;
         SymbolTable symbols;
         std::string error, decoded;
@@ -174,14 +185,103 @@ int main() {
             std::cerr << "mov " << reg.first << " immediate encoded incorrectly\n";
             return 1;
         }
+        for (std::uint8_t value : {std::uint8_t{0}, std::uint8_t{0x42}, std::uint8_t{0xFF}}) {
+            const std::vector<std::uint8_t> encoded{0x90, reg.second, value};
+            std::size_t position = 1;
+            std::string decoded;
+            if (!x86.decoder()->decode(encoded, position, decoded) || position != encoded.size() ||
+                decoded != std::string("mov ") + reg.first + ", " + std::to_string(value)) {
+                std::cerr << "mov " << reg.first << " immediate decoded incorrectly\n";
+                return 1;
+            }
+        }
+        const std::vector<std::uint8_t> truncated{0x90, reg.second};
+        std::size_t position = 1;
+        std::string decoded;
+        if (x86.decoder()->decode(truncated, position, decoded) || position != 1) {
+            std::cerr << "x86 accepted truncated mov " << reg.first << '\n';
+            return 1;
+        }
     }
-    for (const char* reg : {"eax", "spl", "r8w", "r8b"}) {
+    for (const char* reg : {"spl", "r8w", "r8b"}) {
         bytes.clear();
         if (x86.encoder()->encode_immediate("mov", reg, 0, bytes, error) || !bytes.empty()) {
             std::cerr << "x86 accepted unsupported register " << reg << '\n';
             return 1;
         }
     }
+    for (const auto& test : {
+             std::pair<X86Mode, std::vector<std::uint8_t>>{X86Mode::Bits16, {0xB9, 0x34, 0x12}},
+             {X86Mode::Bits32, {0x66, 0xB9, 0x34, 0x12}},
+             {X86Mode::Bits64, {0x66, 0xB9, 0x34, 0x12}}}) {
+        x86.setMode(test.first);
+        std::size_t position = 0;
+        std::string decoded;
+        if (!x86.decoder()->decode(test.second, position, decoded) ||
+            position != test.second.size() || decoded != "mov cx, 4660") {
+            std::cerr << "16-bit immediate decoding failed\n";
+            return 1;
+        }
+        for (std::size_t length = 0; length < test.second.size(); ++length) {
+            std::vector<std::uint8_t> truncated(test.second.begin(), test.second.begin() + length);
+            position = 0;
+            if (x86.decoder()->decode(truncated, position, decoded) || position != 0) {
+                std::cerr << "Truncated immediate move accepted\n";
+                return 1;
+            }
+        }
+    }
+    x86.setMode(X86Mode::Bits64);
+    for (const auto& test : {
+             std::pair<std::vector<std::uint8_t>, const char*>{{0xB8, 0x78, 0x56, 0x34, 0x12}, "mov eax, 305419896"},
+             {{0x48, 0xB8, 0x78, 0x56, 0x34, 0x12, 0, 0, 0, 0}, "mov rax, 305419896"}}) {
+        std::size_t position = 0;
+        std::string decoded;
+        if (!x86.decoder()->decode(test.first, position, decoded) ||
+            position != test.first.size() || decoded != test.second) {
+            std::cerr << "32/64-bit immediate decoding failed\n";
+            return 1;
+        }
+    }
+    const char* names16[] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"};
+    const char* names32[] = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"};
+    const char* names64[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi"};
+    for (X86Mode mode : {X86Mode::Bits16, X86Mode::Bits32, X86Mode::Bits64}) {
+        x86.setMode(mode);
+        for (unsigned width : {16u, 32u, 64u}) {
+            if (width == 64 && mode != X86Mode::Bits64) continue;
+            for (unsigned id = 0; id < 8; ++id) {
+                std::vector<std::uint8_t> instruction{0x90};
+                if ((width == 16 && mode != X86Mode::Bits16) ||
+                    (width == 32 && mode == X86Mode::Bits16))
+                    instruction.push_back(0x66);
+                if (width == 64) instruction.push_back(0x48);
+                instruction.push_back(static_cast<std::uint8_t>(0xB8 + id));
+                const std::uint64_t value = width == 16 ? 0xABCDULL :
+                                            width == 32 ? 0x89ABCDEFULL : 0xFEDCBA9876543210ULL;
+                for (unsigned i = 0; i < width / 8; ++i)
+                    instruction.push_back(static_cast<std::uint8_t>(value >> (8 * i)));
+                const char* name = width == 16 ? names16[id] : width == 32 ? names32[id] : names64[id];
+                std::string decoded;
+                std::size_t position = 1;
+                if (!x86.decoder()->decode(instruction, position, decoded) ||
+                    position != instruction.size() ||
+                    decoded != std::string("mov ") + name + ", " + std::to_string(value)) {
+                    std::cerr << "Immediate decoding failed for " << name << '\n';
+                    return 1;
+                }
+                for (std::size_t length = 1; length < instruction.size(); ++length) {
+                    const std::vector<std::uint8_t> truncated(instruction.begin(), instruction.begin() + length);
+                    position = 1;
+                    if (x86.decoder()->decode(truncated, position, decoded) || position != 1) {
+                        std::cerr << "Truncated immediate accepted for " << name << '\n';
+                        return 1;
+                    }
+                }
+            }
+        }
+    }
+    x86.setMode(X86Mode::Bits16);
     for (std::uint64_t value : {0u, 42u, 255u}) {
         bytes.clear();
         if (!x86.encoder()->encode_immediate("mov", "al", value, bytes, error)) {

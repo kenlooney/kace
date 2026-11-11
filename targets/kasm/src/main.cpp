@@ -1,7 +1,6 @@
 #include <iostream>
 #include "kace/source.hpp"
-#include "kace/statement.hpp"
-#include "kace/semantic.hpp"
+#include "kasm/kasmstatement.hpp"
 #include "kace/loader.hpp"
 #include "kasm/diagnostic.hpp"
 #include "kasm/kasmparser.hpp"
@@ -200,7 +199,7 @@ bool loadCpu(const CommandLine &commandLine, const char *argv0, Loader &loader, 
     return true;
 }
 
-bool expandIncludes(const Source &source, std::vector<Statement> &statements,
+bool expandIncludes(const Source &source, std::vector<std::unique_ptr<Statement>> &statements,
                     std::vector<std::filesystem::path> &active, std::string &error)
 {
     std::error_code pathError;
@@ -223,12 +222,19 @@ bool expandIncludes(const Source &source, std::vector<Statement> &statements,
     active.push_back(sourcePath);
     const std::vector<Token> tokens;
     KasmParser parser(tokens);
-    std::vector<Statement> parsed;
+    std::vector<std::unique_ptr<Statement>> parsed;
     if (!parser.parse(source, parsed, error))
         return false;
-    for (Statement &statement : parsed)
+    for (auto &statementPtr : parsed)
     {
-        if (statement.kind == StatementKind::Directive &&
+        auto *kasmStatement = dynamic_cast<KasmStatement *>(statementPtr.get());
+        if (!kasmStatement)
+        {
+            error = source.name + ": parser returned an invalid KASM statement";
+            return false;
+        }
+        KasmStatement &statement = *kasmStatement;
+        if (statement.has_kind("Directive") &&
             statement.directiveKind == DirectiveKind::Include)
         {
             const auto path = sourcePath.parent_path() / std::filesystem::path(statement.includePath);
@@ -243,7 +249,7 @@ bool expandIncludes(const Source &source, std::vector<Statement> &statements,
                 return false;
         }
         else
-            statements.push_back(std::move(statement));
+            statements.push_back(std::move(statementPtr));
     }
     active.pop_back();
     return true;
@@ -348,7 +354,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    std::vector<Statement> statements;
+    std::vector<std::unique_ptr<Statement>> statements;
     std::string error;
     if (!commandLine.output.empty() && commandLine.input.empty())
     {
