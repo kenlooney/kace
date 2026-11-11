@@ -50,6 +50,97 @@ bool test_register_file() {
     return true;
 }
 
+bool test_conditional_jumps() {
+    X86 cpu;
+    for (X86Mode mode : {X86Mode::Bits16, X86Mode::Bits32, X86Mode::Bits64}) {
+        cpu.setMode(mode);
+        for (const auto& condition : {std::pair<const char*, std::uint8_t>{"jz", 0x74},
+                                      {"jnz", 0x75}, {"jc", 0x72}, {"jnc", 0x73}}) {
+            for (std::int64_t displacement : {-128, -2, 0, 5, 127}) {
+                std::vector<std::uint8_t> bytes{0x90};
+                std::string error, text;
+                if (!cpu.encoder()->encode_conditional_jump(condition.first, displacement, bytes, error) ||
+                    bytes != std::vector<std::uint8_t>{0x90, condition.second,
+                                                       static_cast<std::uint8_t>(displacement)}) {
+                    std::cerr << "Conditional jump encoding failed for " << condition.first << '\n';
+                    return false;
+                }
+                std::size_t offset = 1;
+                if (!cpu.decoder()->decode(bytes, offset, text) || offset != bytes.size() ||
+                    text != std::string(condition.first) + " " + std::to_string(displacement)) {
+                    std::cerr << "Conditional jump decoding failed for " << condition.first << '\n';
+                    return false;
+                }
+            }
+            for (std::int64_t displacement : {-129, 128}) {
+                std::vector<std::uint8_t> bytes{0x90};
+                std::string error;
+                if (cpu.encoder()->encode_conditional_jump(condition.first, displacement, bytes, error) ||
+                    error.empty() || bytes != std::vector<std::uint8_t>{0x90}) {
+                    std::cerr << "Invalid conditional displacement accepted\n";
+                    return false;
+                }
+            }
+            const std::vector<std::uint8_t> truncated{0x90, condition.second};
+            std::size_t offset = 1;
+            std::string text;
+            if (cpu.decoder()->decode(truncated, offset, text) || offset != 1) {
+                std::cerr << "Truncated conditional jump accepted\n";
+                return false;
+            }
+        }
+        std::vector<std::uint8_t> bytes{0x90};
+        std::string error, text;
+        if (cpu.encoder()->encode_conditional_jump("unknown", 0, bytes, error) ||
+            error.empty() || bytes != std::vector<std::uint8_t>{0x90}) {
+            std::cerr << "Unknown conditional jump accepted\n";
+            return false;
+        }
+        const std::vector<std::uint8_t> unsupported{0x70, 0};
+        std::size_t offset = 0;
+        if (cpu.decoder()->decode_conditional_jump(unsupported, offset, text) || offset != 0) {
+            std::cerr << "Unsupported conditional opcode accepted\n";
+            return false;
+        }
+    }
+    return true;
+}
+
+bool test_conditional_fixups() {
+    X86 cpu;
+    std::vector<std::unique_ptr<Statement>> statements;
+    auto start = std::make_unique<KasmStatement>();
+    start->add_kind("Label");
+    start->set_name("start");
+    statements.push_back(std::move(start));
+    auto forward = std::make_unique<KasmStatement>();
+    forward->add_kind("ConditionalJump");
+    forward->set_name("jz");
+    forward->target = "end";
+    statements.push_back(std::move(forward));
+    auto nop = std::make_unique<KasmStatement>();
+    nop->set_name("nop");
+    statements.push_back(std::move(nop));
+    auto end = std::make_unique<KasmStatement>();
+    end->add_kind("Label");
+    end->set_name("end");
+    statements.push_back(std::move(end));
+    auto backward = std::make_unique<KasmStatement>();
+    backward->add_kind("ConditionalJump");
+    backward->set_name("jnz");
+    backward->target = "start";
+    statements.push_back(std::move(backward));
+    std::vector<std::uint8_t> bytes;
+    SymbolTable symbols;
+    std::string error;
+    if (!cpu.assembler()->assemble(statements, bytes, symbols, error) ||
+        bytes != std::vector<std::uint8_t>{0x74, 0x01, 0x90, 0x75, 0xFB}) {
+        std::cerr << "Conditional jump fixups failed: " << error << '\n';
+        return false;
+    }
+    return true;
+}
+
 bool test_near_modes() {
     X86 cpu;
     for (const X86Mode mode : {X86Mode::Bits16, X86Mode::Bits32, X86Mode::Bits64}) {
@@ -135,6 +226,8 @@ bool test_near_modes() {
 
 int main() {
     if (!test_register_file()) return 1;
+    if (!test_conditional_jumps()) return 1;
+    if (!test_conditional_fixups()) return 1;
     if (!test_near_modes()) return 1;
     X86 x86;
     std::uint8_t byte = 0;

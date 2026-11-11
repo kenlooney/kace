@@ -94,16 +94,16 @@ bool X86Encoder::encode_immediate(
             error = "Immediate does not fit in 16 bits";
             return false;
         }
-        if(mode() == X86Mode::Bits32 || mode() == X86Mode::Bits64)
+        if (mode() == X86Mode::Bits32 || mode() == X86Mode::Bits64)
         {
-             bytes.push_back({static_cast<std::uint8_t>(0x66)}); // Operand-size override prefix for 16-bit immediate
+            bytes.push_back({static_cast<std::uint8_t>(0x66)}); // Operand-size override prefix for 16-bit immediate
         }
         bytes.push_back({static_cast<std::uint8_t>(0xB8 + regPtr->getGroupId())});
         bytes.push_back({static_cast<std::uint8_t>(value)});
         bytes.push_back({static_cast<std::uint8_t>(value >> 8)});
         return true;
     }
-    
+
     // 32-bit register immediate encoding (future)
     if (regPtr->hasWidth(reg, 32) && regPtr->getGroupId() < 8)
     {
@@ -112,7 +112,7 @@ bool X86Encoder::encode_immediate(
             error = "Immediate does not fit in 32 bits";
             return false;
         }
-        if(mode() == X86Mode::Bits16)
+        if (mode() == X86Mode::Bits16)
         {
             bytes.push_back({static_cast<std::uint8_t>(0x66)}); // Operand-size override prefix for 32-bit immediate in 16-bit mode
         }
@@ -127,7 +127,8 @@ bool X86Encoder::encode_immediate(
     // 64-bit register immediate encoding (future)
     if (regPtr->hasWidth(reg, 64) && regPtr->getGroupId() < 8)
     {
-        if(mode() != X86Mode::Bits64) {
+        if (mode() != X86Mode::Bits64)
+        {
             error = "64-bit immediate encoding is only supported in 64-bit mode";
             return false;
         }
@@ -148,54 +149,89 @@ bool X86Encoder::encode_immediate(
     return false;
 }
 
-    bool X86Encoder::encode_near_jump(
-        std::int64_t displacement, std::vector<std::uint8_t> &bytes,
-        std::string &error) const
+bool X86Encoder::encode_near_jump(
+    std::int64_t displacement, std::vector<std::uint8_t> &bytes,
+    std::string &error) const
+{
+    const std::size_t size = near_displacement_size(cpu_.getMode());
+    if (size == 0)
     {
-        const std::size_t size = near_displacement_size(cpu_.getMode());
-        if (size == 0)
-        {
-            error = "Invalid CPU mode for near jump";
-            return false;
-        }
-        const std::int64_t min = size == 2 ? -32768 : -2147483648LL;
-        const std::int64_t max = size == 2 ? 32767 : 2147483647LL;
-        if (displacement < min || displacement > max)
-        {
-            error = "Near-jump displacement out of range";
-            return false;
-        }
-        const auto raw = static_cast<std::uint64_t>(displacement);
-        bytes.push_back(0xE9);
-        for (std::size_t i = 0; i < size; ++i)
-            bytes.push_back(static_cast<std::uint8_t>(raw >> (8 * i)));
-        error.clear();
-        return true;
+        error = "Invalid CPU mode for near jump";
+        return false;
+    }
+    const std::int64_t min = size == 2 ? -32768 : -2147483648LL;
+    const std::int64_t max = size == 2 ? 32767 : 2147483647LL;
+    if (displacement < min || displacement > max)
+    {
+        error = "Near-jump displacement out of range";
+        return false;
+    }
+    const auto raw = static_cast<std::uint64_t>(displacement);
+    bytes.push_back(0xE9);
+    for (std::size_t i = 0; i < size; ++i)
+        bytes.push_back(static_cast<std::uint8_t>(raw >> (8 * i)));
+    error.clear();
+    return true;
+}
+
+bool X86Encoder::encode_far_jump(
+    std::uint64_t segment,
+    std::uint64_t offset,
+    std::vector<std::uint8_t> &bytes,
+    std::string &error) const
+{
+    // Far jump encoding is only supported in 16-bit mode
+    if (cpu_.getMode() != X86Mode::Bits16)
+    {
+        error = "far jump encoding is only supported in 16-bit mode";
+        return false;
+    }
+    if (segment > 0xFFFF || offset > 0xFFFF)
+    {
+        error = "far jump segment and offset must fit in 16 bits";
+        return false;
     }
 
-    bool X86Encoder::encode_far_jump(
-        std::uint64_t segment,
-        std::uint64_t offset,
-        std::vector<std::uint8_t> &bytes,
-        std::string &error) const
-    {
-        // Far jump encoding is only supported in 16-bit mode
-        if (cpu_.getMode() != X86Mode::Bits16)
-        {
-            error = "far jump encoding is only supported in 16-bit mode";
-            return false;
-        }
-        if (segment > 0xFFFF || offset > 0xFFFF)
-        {
-            error = "far jump segment and offset must fit in 16 bits";
-            return false;
-        }
+    bytes = {
+        0xEA,
+        static_cast<std::uint8_t>(offset),
+        static_cast<std::uint8_t>(offset >> 8),
+        static_cast<std::uint8_t>(segment),
+        static_cast<std::uint8_t>(segment >> 8)};
+    return true;
+}
 
-        bytes = {
-            0xEA,
-            static_cast<std::uint8_t>(offset),
-            static_cast<std::uint8_t>(offset >> 8),
-            static_cast<std::uint8_t>(segment),
-            static_cast<std::uint8_t>(segment >> 8)};
-        return true;
+bool X86Encoder::encode_conditional_jump(
+    const std::string &condition,
+    std::int64_t displacement,
+    std::vector<std::uint8_t> &bytes,
+    std::string &error) const
+{
+    std::uint8_t opcode = 0;
+
+
+    if (condition == "jz")
+        opcode = 0x74; // jz short
+    else if (condition == "jnz")
+        opcode = 0x75; // jnz short
+    else if (condition == "jc")
+        opcode = 0x72; // jc short
+    else if (condition == "jnc")
+        opcode = 0x73; // jnc short
+    else
+    {
+        error = "Unsupported conditional jump";
+        return false;
     }
+
+    if (displacement < -128 || displacement > 127)
+    {
+        error = "Conditional jump displacement out of range";
+        return false;
+    }
+
+    bytes.push_back(opcode);
+    bytes.push_back(static_cast<std::uint8_t>(displacement));
+    error.clear();
+    return true;
+}

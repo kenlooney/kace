@@ -70,6 +70,15 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             continue;
         }
 
+        if (statement.has_kind("ConditionalJump"))
+        {
+            fixups.push_back({{statement.target, offset, statement.line,
+                               JumpKind::Short, statement.sourceName, statement.name()},
+                              current_mode});
+            output.insert(output.end(), 2, 0);
+            continue;
+        }
+
         if (statement.has_kind("JumpShort") || statement.has_kind("JumpNear"))
         {
             const bool near = statement.has_kind("JumpNear");
@@ -168,9 +177,13 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
                                      : 2;
         const auto displacement = static_cast<std::int64_t>(label->offset) - static_cast<std::int64_t>(fixup.offset) - static_cast<std::int64_t>(size);
         std::vector<std::uint8_t> encoded;
-        const bool ok = fixup.kind == JumpKind::Near
-                            ? cpu_.encoder()->encode_near_jump(displacement, encoded, error)
-                            : cpu_.encoder()->encode_short_jump(displacement, encoded, error);
+        bool ok;
+        if (!fixup.condition.empty())
+            ok = cpu_.encoder()->encode_conditional_jump(fixup.condition, displacement, encoded, error);
+        else if (fixup.kind == JumpKind::Near)
+            ok = cpu_.encoder()->encode_near_jump(displacement, encoded, error);
+        else
+            ok = cpu_.encoder()->encode_short_jump(displacement, encoded, error);
         if (!ok || encoded.size() != size)
         {
             error = location + (error.empty() ? "Invalid jump encoding" : error);

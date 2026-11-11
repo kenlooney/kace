@@ -29,5 +29,6 @@ struct JumpFixup {
     std::size_t line;   // For error messages
     JumpKind kind = JumpKind::Short;
     std::string sourceName;
+    std::string condition;
   
 };

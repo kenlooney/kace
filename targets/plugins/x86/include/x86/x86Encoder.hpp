@@ -50,6 +50,13 @@ public:
         std::vector<std::uint8_t>& bytes,
         std::string& error
     ) const;
+
+    bool encode_conditional_jump(
+        const std::string& condition,
+        std::int64_t displacement,
+        std::vector<std::uint8_t>& bytes,
+        std::string& error
+    ) const;
 private:
     X86& cpu_;
 };

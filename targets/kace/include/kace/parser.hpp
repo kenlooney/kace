@@ -65,6 +65,11 @@ public:
         add_alias("$", {"$"});
         add_alias("$$", {"$$"});
         add_alias("jmp", {"jmp"});
+        add_alias("jz", {"jz"});
+        add_alias("jnz", {"jnz"});
+        add_alias("jc", {"jc"});
+        add_alias("jnc", {"jnc"});
+        
        
     }
     bool is_keyword(const std::string& symbol) const {

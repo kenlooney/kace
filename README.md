@@ -51,6 +51,7 @@ assembly concepts.
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
 - Label recognition, offset recording, and short- and near-jump fixups, plus a symbol
   table with save/load helpers
+- Short conditional jumps with label fixups and readable condition aliases
 - Assembly and disassembly of 16-bit far jumps with segment and offset literals
 - Extensible keyword and operator alias tables
 - CTest-based automated tests
@@ -180,6 +181,41 @@ the jump. Unknown labels and displacements outside -128 through 127 are
 reported before the output file is opened. Duplicate label definitions are
 reported as errors.
 
+### Short conditional jumps
+
+KASM supports four short conditional jumps, with aliases for readable source:
+
+| Instruction | Alias | Condition | Opcode |
+|-------------|-------|-----------|--------|
+| `jz` | `ifequal` | Zero flag is set | `74` |
+| `jnz` | `ifnotequal` | Zero flag is clear | `75` |
+| `jc` | `ifcarry` | Carry flag is set | `72` |
+| `jnc` | `ifnotcarry` | Carry flag is clear | `73` |
+
+The instructions test CPU flags; they don't compare values themselves. When a
+preceding comparison sets the zero flag, `ifequal` and `ifnotequal` can be used
+to branch on its result. For example:
+
+```asm
+start:
+ifequal done
+nop
+done:
+ifnotequal start
+```
+
+This produces `74 01 90 75 FB`. The assembler resolves forward and backward
+labels, and each displacement must fit in -128 through 127 bytes from the end
+of the two-byte instruction. These are short forms in all supported modes;
+near conditional forms are not yet supported.
+
+Disassembly uses the canonical names and prints numeric displacements, such as
+`jz 1` and `jnz -5`. Conditional targets are not yet restored from symbol
+files, and the output's numeric conditional targets are not currently accepted
+by the label-based parser.
+
+### Near and far jumps
+
 KASM also accepts `jmp near label` (and its `jump` and `goto` aliases). In the
 CLI's default 16-bit x86 mode, the `E9` near jump is three bytes with a signed
 16-bit displacement, from -32768 through 32767, relative to the instruction's
@@ -279,8 +315,9 @@ statements. For example, `mov cx, 0x1234` in the default 16-bit mode produces
 are not yet implemented. Expanding instruction, register, and prefix support
 remains future work.
 
-The x86 plugin can decode `nop`, supported register-immediate moves, short jumps, mode-aware
-near jumps, and 16-bit far jumps. To disassemble an existing binary into a text
+The x86 plugin can decode `nop`, supported register-immediate moves, short
+unconditional and conditional jumps, mode-aware near jumps, and 16-bit far jumps.
+To disassemble an existing binary into a text
 file, run:
 
 ```powershell
@@ -327,8 +364,8 @@ statement parsing, CLI output, CPU plugins, x86 encoding and decoding, and
 symbol table persistence. The CLI tests also cover jumps, position-based
 padding, nested includes, and position assertions, including failure cases. The
 x86 plugin tests cover register aliases, immediate encodings, mode-aware
-immediate decoding and truncated input, near-jump widths, range limits, and
-fixups in all three modes.
+immediate decoding and truncated input, conditional-jump encodings and
+fixups, near-jump widths, range limits, and fixups in all three modes.
 Use CTest's `-V` option to show output
 from passing tests, or select a test in CMake Tools' Test Explorer.
 
@@ -350,6 +387,7 @@ Planned development includes:
 
 - Output for word, double-word, and quad-word data definitions
 - Far-jump support in additional CPU modes and broader label resolution
+- Near conditional jumps and conditional target restoration during disassembly
 - Mode-aware support for more instructions and disassembly mode selection
 - Register-to-register and memory moves, and broader disassembly support
 - Completing the statement parsing contract and refining plugin language boundaries
