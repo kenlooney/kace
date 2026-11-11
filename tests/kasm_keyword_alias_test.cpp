@@ -49,6 +49,28 @@ int main() {
             return 1;
         }
     }
+    source.text = "jz done\nifequal done\njnz done\nifnotequal done\n"
+                  "jc done\nifcarry done\njnc done\nifnotcarry done\n";
+    const char* expectedConditions[] = {"jz", "jz", "jnz", "jnz", "jc", "jc", "jnc", "jnc"};
+    if (!parser.parse(source, statements, error) || statements.size() != 8) {
+        std::cerr << "Conditional jump parsing failed: " << error << '\n';
+        return 1;
+    }
+    for (std::size_t i = 0; i < statements.size(); ++i) {
+        const auto* statement = dynamic_cast<const KasmStatement*>(statements[i].get());
+        if (!statement || !statement->has_kind("ConditionalJump") ||
+            statement->name() != expectedConditions[i] || statement->target != "done") {
+            std::cerr << "Conditional jump or alias parsed incorrectly at index " << i << '\n';
+            return 1;
+        }
+    }
+    for (const std::string& invalid : {"jz", "ifequal 42", "ifcarry done extra", "jnc ,"}) {
+        source.text = invalid;
+        if (parser.parse(source, statements, error) || error.find("aliases:1:") == std::string::npos) {
+            std::cerr << "Invalid conditional jump accepted: " << invalid << '\n';
+            return 1;
+        }
+    }
     source.text = "jmp short done\njump short done\ngoto short done\n";
     if (!parser.parse(source, statements, error) || statements.size() != 3 ||
         !statements[0]->has_kind("JumpShort") ||

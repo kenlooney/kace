@@ -34,9 +34,11 @@ public:
     bool decode_immediate(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const;
     bool decode_near_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const;
     bool decode_far_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const;
-
+    bool decode_conditional_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const;
+    
     bool near_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
                                 std::int64_t &displacement) const;
+    
     
     // Return CPU mode
     X86Mode mode() const;

@@ -59,6 +59,11 @@ public:
         keywords_table.addto_alias("db", "byte");
         keywords_table.addto_alias("dw", "defineword");
         keywords_table.addto_alias("dw", "word");
+
+        keywords_table.addto_alias("jz", "ifequal");
+        keywords_table.addto_alias("jnz", "ifnotequal");
+        keywords_table.addto_alias("jc", "ifcarry");
+        keywords_table.addto_alias("jnc", "ifnotcarry");
     }
 
     bool parse(
@@ -88,10 +93,10 @@ public:
 
             // Check for code segment keywords like "code16", "code32", "code64" before identifiers
             if (tokens[0].kind == "identifier" &&
-            
+
                 (tokens[0].text == "code16" || tokens[0].text == "code32" || tokens[0].text == "code64"))
             {
-                if(tokens.size() != 1)
+                if (tokens.size() != 1)
                 {
                     error = source.name + ":" + std::to_string(line_number) +
                             ": Unexpected tokens after code segment declaration";
@@ -102,7 +107,7 @@ public:
                 statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
-            
+
             // Check for directives before identifiers
             if (tokens[0].kind == "directive")
             {
@@ -162,11 +167,10 @@ public:
                         return false;
                     }
 
-                   
                     statement.set_name("assertposition");
                     statement.directiveKind = DirectiveKind::AssertPosition;
                     statement.directiveStage = DirectiveStage::Assembly;
-                     
+
                     std::uint64_t position;
                     if (!parse_integer(tokens[2].text, position))
                     {
@@ -175,7 +179,6 @@ public:
                         return false;
                     }
                     statement.assertPosition = position;
-
                 }
 
                 statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
@@ -277,6 +280,35 @@ public:
                 }
 
                 statement.type = DataType::Byte;
+            }
+
+            if (statement.name() == "jz" || statement.name() == "jnz" ||
+                statement.name() == "jc" || statement.name() == "jnc")
+            {
+                
+                if(tokens.size() == 1 || tokens.size() > 2)
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Unexpected tokens for the conditional jump";
+                    return false;
+                }  
+                if(tokens[1].text.empty())
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Expected a target label for the conditional jump";
+                    return false;
+                }
+                if (tokens[1].kind != "identifier")
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Expected a target label for the conditional jump";
+                    return false;
+                }
+                
+                statement.target = tokens[1].text;
+                statement.add_kind("ConditionalJump");
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
+                continue;
             }
 
             if (statement.name() == "mov")

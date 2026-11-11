@@ -59,6 +59,11 @@ bool X86Decoder::decode(
         return decode_near_jump(bytes, offset, text);
     case 0xEA:
         return decode_far_jump(bytes, offset, text);
+    case 0x74:
+    case 0x75:
+    case 0x72:
+    case 0x73:
+        return decode_conditional_jump(bytes, offset, text);
 
     default:
         return false;
@@ -119,10 +124,11 @@ bool X86Decoder::decode_immediate(const std::vector<std::uint8_t> &bytes, std::s
         if (bytes.size() - opcode_offset - 1 < immediate_size)
             return false;
 
-        static const char* const names16[] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"};
-        static const char* const names32[] = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"};
-        static const char* const names64[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi"};
-        const char* const* names = width == 16 ? names16 : width == 32 ? names32 : names64;
+        static const char *const names16[] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"};
+        static const char *const names32[] = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"};
+        static const char *const names64[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi"};
+        const char *const *names = width == 16 ? names16 : width == 32 ? names32
+                                                                       : names64;
         std::uint64_t value = 0;
         for (std::size_t i = 0; i < immediate_size; ++i)
             value |= static_cast<std::uint64_t>(bytes[opcode_offset + 1 + i]) << (8 * i);
@@ -213,6 +219,41 @@ bool X86Decoder::decode_short_jump(const std::vector<std::uint8_t> &bytes, std::
     offset += 2;
     text = "jmp " + std::to_string(displacement);
     return true;
+}
+
+bool X86Decoder::decode_conditional_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+{
+    if (offset >= bytes.size())
+        return false;
+    std::uint8_t opcode = bytes[offset];
+    if (opcode >= 0x70 && opcode <= 0x7F)
+    {
+        if (offset + 1 >= bytes.size())
+            return false;
+        const auto raw = bytes[offset + 1];
+        const int displacement = raw < 128 ? raw : static_cast<int>(raw) - 256;
+
+        switch (opcode)
+        {
+        case 0x74:
+            text = "jz " + std::to_string(displacement);
+            break;
+        case 0x75:
+            text = "jnz " + std::to_string(displacement);
+            break;
+        case 0x72:
+            text = "jc " + std::to_string(displacement);
+            break;
+        case 0x73:
+            text = "jnc " + std::to_string(displacement);
+            break;
+        default:
+            return false;
+        }
+        offset += 2;
+        return true;
+    }
+    return false;
 }
 
 bool X86Decoder::short_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
