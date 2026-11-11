@@ -16,19 +16,18 @@
 #include <kace/parser.hpp>
 #include <kace/statement.hpp>
 
-
-bool parse_statement(const std::vector<Token>& tokens,
-                     Statement& statement, std::string& error) {
-    if (tokens.empty() || tokens[0].kind != "identifier") {
-        error = "Expected a statement name";
-        return false;
-    }
-    statement.name = tokens[0].text;
-     std::vector<Token> operands(tokens.begin() + 1, tokens.end());
-    Parser parser(operands, statement.expression);
-    return parser.parse_expression(
-        statement.expression,
-        statement.value,
-        error
-    );
-}
+// bool Statement::parse_statement(const std::vector<Token> &tokens, std::string &error)
+// {
+//     if (tokens.empty() || tokens[0].kind != "identifier") {
+//         error = "Expected a statement name";
+//         return false;
+//     }
+//     set_name(tokens[0].text);
+//     std::vector<Token> operands(tokens.begin() + 1, tokens.end());
+//     Parser parser(operands, expression);
+//     return parser.parse_expression(
+//         expression,
+//         value,
+//         error
+//     );
+// }

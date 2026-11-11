@@ -2,13 +2,13 @@
 #include <x86/x86.hpp>
 #include <kace/fixup.hpp>
 #include <kace/parser.hpp>
-#include <kace/semantic.hpp>
+#include <kasm/kasmsemantic.hpp>
 #include <algorithm>
 #include <limits>
 #include <iostream>
 #include <x86/mode.hpp>
 
-bool X86Assembler::assemble(const std::vector<Statement> &statements,
+bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &statements,
                             std::vector<std::uint8_t> &bytes,
                             SymbolTable &symbols, std::string &error) const
 {
@@ -25,8 +25,15 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
         error = statement.sourceName + ":" + std::to_string(statement.line) + ": " + message;
         return false;
     };
-    for (const Statement &statement : statements)
+    for (const auto &statementPtr : statements)
     {
+        const Statement &statement = *statementPtr;
+        const auto *kasmStatement = dynamic_cast<const KasmStatement *>(statementPtr.get());
+        if (!kasmStatement)
+        {
+            error = "x86 assembler expected a KASM statement";
+            return false;
+        }
         const std::size_t offset = output.size();
 
         if (statement.kind == StatementKind::CodeSegment)
@@ -85,10 +92,35 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
             output.insert(output.end(), encoded.begin(), encoded.end());
             continue;
         }
-        std::uint8_t byte = 0;
-        if (statement.kind == StatementKind::Times)
+        if (statement.name == "mov")
         {
-            if (!check_byte(statement, byte, error))
+            Parser evaluator(std::vector<Token>{});
+            PositionContext positions{offset, 0};
+            std::uint64_t value = 0;
+
+            if (!evaluator.evaluate(statement.expression, statement.expression.root,
+                                    value, error, &positions))
+            {
+                return fail(statement, error);
+            }
+            cpu_.setMode(current_mode);
+            std::vector<std::vector<std::uint8_t>> encoded;
+
+            if (!cpu_.encoder()->encode_immediate(
+                    statement.name, statement.reg, value, encoded, error))
+            {
+                return fail(statement, error);
+            }
+            for (const auto &part : encoded)
+            {
+                output.insert(output.end(), part.begin(), part.end());
+            }
+            continue;
+        }
+        std::uint8_t byte = 0;
+        if (statement.has_kind("Times"))
+        {
+            if (!check_kasm_byte(*kasmStatement, byte, error))
                 return fail(statement, error);
             Parser evaluator(std::vector<Token>{});
             PositionContext positions{offset, 0};
@@ -102,7 +134,7 @@ bool X86Assembler::assemble(const std::vector<Statement> &statements,
         }
         if (statement.type != DataType::None)
         {
-            if (!check_byte(statement, byte, error))
+            if (!check_kasm_byte(*kasmStatement, byte, error))
                 return fail(statement, error);
         }
         else if (!statement.expression.nodes.empty() || !cpu_.encoder()->encode_no_operand(statement.name, byte))

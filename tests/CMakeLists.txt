@@ -24,7 +24,7 @@ add_executable(x86_plugin_test x86_plugin_test.cpp)
 target_link_libraries(x86_plugin_test PRIVATE x86)
 
 add_executable(cpu_loader_test cpu_loader_test.cpp)
-target_link_libraries(cpu_loader_test PRIVATE kace)
+target_link_libraries(cpu_loader_test PRIVATE kace kasmcore)
 
 add_executable(kasm_keyword_alias_test kasm_keyword_alias_test.cpp)
 target_link_libraries(kasm_keyword_alias_test PRIVATE kasmcore)

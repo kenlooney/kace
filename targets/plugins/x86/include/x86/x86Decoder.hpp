@@ -15,6 +15,7 @@
  */
 #pragma once
 #include <kace/decoder.hpp>
+#include <x86/mode.hpp>
 class X86;
 
 class X86Decoder : public Decoder
@@ -36,6 +37,9 @@ public:
 
     bool near_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
                                 std::int64_t &displacement) const;
+    
+    // Return CPU mode
+    X86Mode mode() const;
 private:
     const X86& cpu_;
 };

@@ -1,3 +1,5 @@
+#include <kasm/kasmstatement.hpp>
+#include <memory>
 /*
  * Copyright (C) 2026 Kenneth Looney
  *
@@ -61,7 +63,7 @@ public:
 
     bool parse(
         const Source &source,
-        std::vector<Statement> &statements,
+        std::vector<std::unique_ptr<Statement>> &statements,
         std::string &error)
     {
         statements.clear();
@@ -80,7 +82,7 @@ public:
                 continue;
             }
 
-            Statement statement;
+            KasmStatement statement;
             statement.line = line_number;
             statement.sourceName = source.name;
 
@@ -97,7 +99,7 @@ public:
                 }
                 statement.kind = StatementKind::CodeSegment;
                 statement.codeSegment = tokens[0].text;
-                statements.push_back(statement);
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
             
@@ -176,7 +178,7 @@ public:
 
                 }
 
-                statements.push_back(statement);
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
 
@@ -186,7 +188,7 @@ public:
 
                 statement.kind = StatementKind::Label;
                 statement.name = tokens[0].text.substr(0, tokens[0].text.size() - 1);
-                statements.push_back(statement);
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
 
@@ -226,7 +228,7 @@ public:
             if (statement.name == "times")
             {
 
-                statement.kind = StatementKind::Times;
+                statement.add_kind(StatementKind("Times"));
                 std::size_t byte_index = 1;
                 std::string data_directive;
                 while (byte_index < tokens.size())
@@ -279,6 +281,7 @@ public:
 
             if (statement.name == "mov")
             {
+                statement.moveKind = MoveKind::ImmediateToRegister;
                 // move/copy/mov <expression> into <register>
                 if (tokens.size() < 4)
                 {
@@ -327,7 +330,7 @@ public:
                         return false;
                     }
                     statement.kind = StatementKind::JumpFar;
-                    statements.push_back(statement);
+                    statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                     continue;
                 }
                 if (tokens.size() != 3 || tokens[2].kind != "identifier")
@@ -348,7 +351,7 @@ public:
                     return false;
                 }
                 statement.target = tokens[2].text;
-                statements.push_back(statement);
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
 
@@ -399,7 +402,7 @@ public:
                 tokens.begin() + operand_end);
             if (operands.empty() && statement.type == DataType::None)
             {
-                statements.push_back(statement);
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
             KasmParser line_parser(operands);
@@ -413,7 +416,7 @@ public:
                 return false;
             }
 
-            statements.push_back(statement);
+            statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
         }
 
         return true;

@@ -14,5 +14,21 @@
  * GNU General Public License for more details.
  */
 #pragma once
-#include "statement.hpp"
-bool check_byte(const Statement& statement, std::uint8_t& byte, std::string& error);
+#include <kace/statement.hpp>
+
+enum class MoveKind
+{
+    ImmediateToRegister,
+    RegisterToRegister,
+    MemoryToRegister,
+    RegisterToMemory,
+    None,
+};
+struct KasmStatement : public Statement
+{
+    std::string sourceName;
+    std::size_t line = 0;
+    DataType type = DataType::None;
+    std::uint64_t value = 0;
+    MoveKind moveKind = MoveKind::None;
+};

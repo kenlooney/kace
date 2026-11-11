@@ -44,8 +44,8 @@ assembly concepts.
   and an x86 plugin that encodes `nop`, short jumps, mode-aware near jumps, and 16-bit far jumps
 - Architecture-neutral register files and x86 register families with named,
   overlapping views and encoding IDs
-- x86 plugin API encoding of immediate moves to 8-bit and 16-bit registers
-  in 16-bit mode
+- x86 plugin API encoding and decoding of supported register-immediate moves,
+  including mode-aware operand sizes
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
 - Label recognition, offset recording, and short- and near-jump fixups, plus a symbol
   table with save/load helpers
@@ -228,22 +228,31 @@ overlapping names such as `rax`, `eax`, `ax`, `al`, and `ah`; each alias
 describes its width and position within the group. Register encoding IDs let
 the encoder distinguish, for example, `al` from `ah`.
 
-Through the x86 plugin's C++ encoder API, 16-bit mode supports `mov` immediate
-to `al`, `cl`, `dl`, `bl`, `ah`, `ch`, `dh`, and `bh`, as well as `ax`,
-`cx`, `dx`, `bx`, `sp`, `bp`, `si`, and `di`. The 8-bit form uses opcode
-`B0` plus the register ID and one immediate byte; the 16-bit form uses `B8`
-plus the register ID and two immediate bytes in little-endian order. For
-example, `mov cx, 0x1234` encodes as `B9 34 12`, and `mov ah, 0x42` as
-`B4 42`. The encoder rejects values that do not fit and registers unavailable
-in 16-bit mode.
+Through the x86 plugin's C++ encoder API, immediate moves support the eight
+8-bit registers `al`, `cl`, `dl`, `bl`, `ah`, `ch`, `dh`, and `bh`, and
+the first eight 16- and 32-bit general-purpose registers. The 8-bit form uses
+opcode `B0` plus the register ID and one immediate byte. The 16- and 32-bit
+forms use `B8` plus the register ID and a little-endian immediate; an operand
+size prefix is emitted when the register width differs from the mode's default.
+For example, in 16-bit mode, `mov cx, 0x1234` encodes as `B9 34 12`, and
+`mov ah, 0x42` as `B4 42`. In 32-bit mode, `mov cx, 0x1234` uses
+`66 B9 34 12`.
+
+The decoder recognizes these 8-bit moves and `B8`–`BF` immediate moves for
+the first eight 16-, 32-, and 64-bit register groups. It interprets operand
+size according to the selected mode, the `66` override, and `48` for the
+64-bit form. For example, in 64-bit mode `48 B8 78 56 34 12 00 00 00 00`
+decodes to `mov rax, 305419896`. Other REX prefixes and extended registers
+are not yet supported by this decoder. The encoder's 64-bit branch is still
+in progress: its width lookup does not yet recognize primary names such as
+`rax`.
 
 These examples describe the encoder API, not a complete CLI assembly workflow:
 the parser accepts immediate `mov` statements, but the x86 assembler does not
-yet connect them to this encoder. The decoder currently supports the `mov al`
-immediate form, not the other immediate register forms. Expanding CLI assembly
-and decoding remains future work.
+yet connect them to this encoder. Connecting CLI assembly and expanding
+instruction and prefix support remain future work.
 
-The x86 plugin can decode `nop`, `mov al, immediate`, short jumps, mode-aware
+The x86 plugin can decode `nop`, supported register-immediate moves, short jumps, mode-aware
 near jumps, and 16-bit far jumps. To disassemble an existing binary into a text
 file, run:
 
@@ -290,8 +299,9 @@ The test suite covers source loading, diagnostics, lexing, expression and
 statement parsing, CLI output, CPU plugins, x86 encoding and decoding, and
 symbol table persistence. The CLI tests also cover jumps, position-based
 padding, nested includes, and position assertions, including failure cases. The
-x86 plugin tests cover register aliases, 8- and 16-bit immediate encodings in
-16-bit mode, near-jump widths, range limits, and fixups in all three modes.
+x86 plugin tests cover register aliases, immediate encodings, mode-aware
+immediate decoding and truncated input, near-jump widths, range limits, and
+fixups in all three modes.
 Use CTest's `-V` option to show output
 from passing tests, or select a test in CMake Tools' Test Explorer.
 

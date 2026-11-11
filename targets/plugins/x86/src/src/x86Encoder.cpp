@@ -65,13 +65,15 @@ bool X86Encoder::encode_immediate(
         return false;
     }
 
-    if (name != "mov" || mode() != X86Mode::Bits16)
+    if (name != "mov")
     {
-        error = "Unsupported instruction or CPU mode for immediate encoding";
+        error = "Unsupported instruction for immediate encoding";
         return false;
     }
 
     unsigned id = 0;
+
+    // 8-bit register immediate encoding
     if (regPtr->hasWidth(reg, 8) && regPtr->getGroupId() < 4 &&
         regPtr->getEncodingId(reg, id))
     {
@@ -84,6 +86,7 @@ bool X86Encoder::encode_immediate(
         bytes.push_back({static_cast<std::uint8_t>(value)});
         return true;
     }
+    // 16-bit register immediate encoding
     if (regPtr->hasWidth(reg, 16) && regPtr->getGroupId() < 8)
     {
         if (value > 0xFFFF)
@@ -91,12 +94,57 @@ bool X86Encoder::encode_immediate(
             error = "Immediate does not fit in 16 bits";
             return false;
         }
+        if(mode() == X86Mode::Bits32 || mode() == X86Mode::Bits64)
+        {
+             bytes.push_back({static_cast<std::uint8_t>(0x66)}); // Operand-size override prefix for 16-bit immediate
+        }
         bytes.push_back({static_cast<std::uint8_t>(0xB8 + regPtr->getGroupId())});
         bytes.push_back({static_cast<std::uint8_t>(value)});
         bytes.push_back({static_cast<std::uint8_t>(value >> 8)});
         return true;
     }
-    error = "Unsupported register for 16-bit mode";
+    
+    // 32-bit register immediate encoding (future)
+    if (regPtr->hasWidth(reg, 32) && regPtr->getGroupId() < 8)
+    {
+        if (value > 0xFFFFFFFF)
+        {
+            error = "Immediate does not fit in 32 bits";
+            return false;
+        }
+        if(mode() == X86Mode::Bits16)
+        {
+            bytes.push_back({static_cast<std::uint8_t>(0x66)}); // Operand-size override prefix for 32-bit immediate in 16-bit mode
+        }
+        bytes.push_back({static_cast<std::uint8_t>(0xB8 + regPtr->getGroupId())});
+        bytes.push_back({static_cast<std::uint8_t>(value)});
+        bytes.push_back({static_cast<std::uint8_t>(value >> 8)});
+        bytes.push_back({static_cast<std::uint8_t>(value >> 16)});
+        bytes.push_back({static_cast<std::uint8_t>(value >> 24)});
+        return true;
+    }
+
+    // 64-bit register immediate encoding (future)
+    if (regPtr->hasWidth(reg, 64) && regPtr->getGroupId() < 8)
+    {
+        if(mode() != X86Mode::Bits64) {
+            error = "64-bit immediate encoding is only supported in 64-bit mode";
+            return false;
+        }
+        bytes.push_back({static_cast<std::uint8_t>(0x48)}); // REX.W prefix for 64-bit immediate
+        bytes.push_back({static_cast<std::uint8_t>(0xB8 + regPtr->getGroupId())});
+        bytes.push_back({static_cast<std::uint8_t>(value)});
+        bytes.push_back({static_cast<std::uint8_t>(value >> 8)});
+        bytes.push_back({static_cast<std::uint8_t>(value >> 16)});
+        bytes.push_back({static_cast<std::uint8_t>(value >> 24)});
+        bytes.push_back({static_cast<std::uint8_t>(value >> 32)});
+        bytes.push_back({static_cast<std::uint8_t>(value >> 40)});
+        bytes.push_back({static_cast<std::uint8_t>(value >> 48)});
+        bytes.push_back({static_cast<std::uint8_t>(value >> 56)});
+        return true;
+    }
+
+    error = "Unsupported register immediate encoding";
     return false;
 }
 

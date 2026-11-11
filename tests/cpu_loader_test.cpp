@@ -1,4 +1,5 @@
 #include <kace/loader.hpp>
+#include <kasm/kasmstatement.hpp>
 
 #include <cstdint>
 #include <iostream>
@@ -6,10 +7,18 @@
 
 class ExampleAssembler : public Assembler {
 public:
-    bool assemble(const std::vector<Statement>&, std::vector<std::uint8_t>& bytes,
+    bool assemble(const std::vector<std::unique_ptr<Statement>>&, std::vector<std::uint8_t>& bytes,
                   SymbolTable&, std::string&) const override {
         bytes = {0x42};
         return true;
+    }
+};
+
+class TestKasmStatement : public KasmStatement {
+public:
+    bool parse_statement(const std::vector<Token>&, std::string& error) override {
+        error = "Parsing is not used by this loader test";
+        return false;
     }
 };
 
@@ -64,11 +73,12 @@ int main(int argc, char* argv[]) {
         std::cerr << "Could not load x86 after a failed load: " << error << '\n';
         return 1;
     }
-    Statement statement;
-    statement.name = "nop";
-    statement.sourceName = "plugin-test";
-    statement.line = 1;
-    std::vector<Statement> statements{statement};
+    auto statement = std::make_unique<TestKasmStatement>();
+    statement->set_name("nop");
+    statement->sourceName = "plugin-test";
+    statement->line = 1;
+    std::vector<std::unique_ptr<Statement>> statements;
+    statements.push_back(std::move(statement));
     std::vector<std::uint8_t> output;
     SymbolTable symbols;
     if (!loader.cpu()->assembler() ||

@@ -424,47 +424,6 @@ bool Parser::parse_expression(
     return run(value, error);
 }
 
-bool Parser::parse(Source &source, std::string &error)
-{
-    std::vector<Statement> statements;
-    std::istringstream input(source.text);
-    std::uint64_t offset = 0;
-    std::string line_text;
-    std::size_t line_number = 1;
-    while (std::getline(input, line_text))
-    {
-        if (line_text.empty())
-        {
-            ++line_number;
-            continue;
-        }
-
-        Statement statement;
-        statement.line = line_number;
-        std::istringstream line_stream(line_text);
-        std::vector<Token> line_tokens;
-        Token token;
-        while (line_stream >> token.text)
-        {
-            line_tokens.push_back(token);
-        }
-
-        Parser line_parser(line_tokens, statement.expression);
-        std::uint64_t value = 0;
-        if (!line_parser.run(value, error))
-        {
-            return false;
-        }
-
-        statement.offset = offset;
-        statements.push_back(statement);
-        offset += value;
-        ++line_number;
-    }
-
-    return true;
-}
-
 bool parse_expression(
     const std::vector<Token> &tokens,
     Expression &expression,

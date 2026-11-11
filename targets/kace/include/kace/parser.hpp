@@ -92,7 +92,6 @@ public:
         const std::string& symbol,
         const std::string& value
     );
-    bool parse(Source& source, std::string& error);
     bool parse_statement(Statement& statement, std::string& error);
     bool run(std::uint64_t& value, std::string& error);
     bool number(std::size_t& node, std::string& error);
