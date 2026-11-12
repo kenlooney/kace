@@ -14,6 +14,28 @@ if(NOT bytes STREQUAL "eb0301020390")
   message(FATAL_ERROR "Unexpected nested include output: ${bytes}")
 endif()
 
+# A label defined in an included file still resolves at its output offset.
+file(WRITE "${source}" "jmp short included\n#include \"nested/first.asm\"\nnop\n")
+file(WRITE "${TEST_DIR}/nested/first.asm" "nop\n    included:\nnop\n")
+execute_process(COMMAND "${KASM}" -i "${source}" -o "${output}" RESULT_VARIABLE result ERROR_VARIABLE error)
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "Included label assembly failed: ${error}")
+endif()
+file(READ "${output}" bytes HEX)
+if(NOT bytes STREQUAL "eb01909090")
+  message(FATAL_ERROR "Unexpected included label output: ${bytes}")
+endif()
+
+# Report both the duplicate location and the first definition's location.
+file(WRITE "${source}" "#include \"nested/first.asm\"\n  included:\n")
+execute_process(COMMAND "${KASM}" -i "${source}" -o "${output}" RESULT_VARIABLE result ERROR_VARIABLE error)
+if(result EQUAL 0 OR NOT error MATCHES "main\\.asm:2:3: Duplicate label: included" OR
+   NOT error MATCHES "first defined at .*first\\.asm:2:5")
+  message(FATAL_ERROR "Expected both label definition locations: ${error}")
+endif()
+
+file(WRITE "${source}" "jmp short finish\n#include \"nested/first.asm\"\nfinish:\nnop\n")
+file(WRITE "${TEST_DIR}/nested/first.asm" "byte 1\n#include 'second.asm'\nbyte 3\n")
 file(WRITE "${TEST_DIR}/nested/second.asm" "#include \"../main.asm\"\n")
 execute_process(COMMAND "${KASM}" -i "${source}" -o "${output}" RESULT_VARIABLE result ERROR_VARIABLE error)
 if(result EQUAL 0 OR NOT error MATCHES "Include cycle")
