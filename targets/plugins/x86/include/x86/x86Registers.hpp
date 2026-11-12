@@ -87,6 +87,8 @@ public:
 
     bool hasWidth(const std::string &name, unsigned width) const
     {
+        if (name == getName())
+            return width == 64;
         for (const auto &alias : aliases_)
         {
             if (alias.name == name)
@@ -96,6 +98,8 @@ public:
     }
     const std::string *getAliasByWidth(unsigned width) const
     {
+        if (width == 64)
+            return &getName();
         for (const auto &alias : aliases_)
         {
             if (alias.width == width && alias.shift == 0)

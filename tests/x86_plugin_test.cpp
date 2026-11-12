@@ -108,6 +108,82 @@ bool test_register_move_encoding() {
             return false;
         }
     }
+    struct WideMoveCase {
+        X86Mode mode;
+        const char* dest;
+        const char* source;
+        std::vector<std::vector<std::uint8_t>> expected;
+    };
+    for (const auto& test : {
+             WideMoveCase{X86Mode::Bits32, "eax", "ebx", {{0x89}, {0xD8}}},
+             {X86Mode::Bits32, "ebx", "eax", {{0x89}, {0xC3}}},
+             {X86Mode::Bits32, "edi", "esi", {{0x89}, {0xF7}}},
+             {X86Mode::Bits64, "rax", "rbx", {{0x48}, {0x89}, {0xD8}}},
+             {X86Mode::Bits64, "rbx", "rax", {{0x48}, {0x89}, {0xC3}}},
+             {X86Mode::Bits64, "rdi", "rsi", {{0x48}, {0x89}, {0xF7}}}}) {
+        cpu.setMode(test.mode);
+        std::vector<std::vector<std::uint8_t>> bytes;
+        std::string error;
+        if (!cpu.encoder()->encode_register("mov", test.dest, test.source, bytes, error) ||
+            bytes != test.expected) {
+            std::cerr << "Register move encoding failed for " << test.dest << ", "
+                      << test.source << ": " << error << '\n';
+            return false;
+        }
+        std::vector<std::uint8_t> encoded{0x90};
+        for (const auto& part : bytes)
+            encoded.insert(encoded.end(), part.begin(), part.end());
+        std::size_t offset = 1;
+        std::string decoded;
+        if (!cpu.decoder()->decode(encoded, offset, decoded) || offset != encoded.size() ||
+            decoded != std::string("mov ") + test.dest + ", " + test.source) {
+            std::cerr << "Wide register move decoding failed for " << test.dest << ", "
+                      << test.source << '\n';
+            return false;
+        }
+        for (std::size_t length = 1; length < encoded.size(); ++length) {
+            const std::vector<std::uint8_t> truncated(encoded.begin(), encoded.begin() + length);
+            offset = 1;
+            if (cpu.decoder()->decode(truncated, offset, decoded) || offset != 1) {
+                std::cerr << "Truncated wide register move accepted\n";
+                return false;
+            }
+        }
+    }
+    cpu.setMode(X86Mode::Bits64);
+    {
+        const std::vector<std::uint8_t> bytes{0x90, 0x89, 0xD8};
+        std::size_t offset = 1;
+        std::string decoded;
+        if (!cpu.decoder()->decode(bytes, offset, decoded) || offset != bytes.size() ||
+            decoded != "mov eax, ebx") {
+            std::cerr << "Unprefixed register move in 64-bit mode decoded incorrectly\n";
+            return false;
+        }
+    }
+    {
+        const std::vector<std::uint8_t> bytes{0x90, 0x48, 0x89, 0x00};
+        std::size_t offset = 1;
+        std::string decoded;
+        if (cpu.decoder()->decode(bytes, offset, decoded) || offset != 1) {
+            std::cerr << "Unsupported memory move accepted\n";
+            return false;
+        }
+    }
+    for (const auto& test : {
+             WideMoveCase{X86Mode::Bits32, "eax", "bx", {}},
+             {X86Mode::Bits32, "r8d", "eax", {}},
+             {X86Mode::Bits64, "rax", "ebx", {}},
+             {X86Mode::Bits64, "rax", "r8", {}}}) {
+        cpu.setMode(test.mode);
+        std::vector<std::vector<std::uint8_t>> bytes{{0x90}};
+        std::string error;
+        if (cpu.encoder()->encode_register("mov", test.dest, test.source, bytes, error) ||
+            bytes != std::vector<std::vector<std::uint8_t>>{{0x90}} || error.empty()) {
+            std::cerr << "Invalid wide register move accepted\n";
+            return false;
+        }
+    }
     return true;
 }
 

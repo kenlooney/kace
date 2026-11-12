@@ -175,6 +175,8 @@ bool X86Encoder::encode_register(
         return false;
     }
     X86Mode mode = cpu_.getMode();
+    int sourceId = sourceReg->getGroupId();
+    int destId = destReg->getGroupId();
 
     switch (mode)
     {
@@ -186,8 +188,7 @@ bool X86Encoder::encode_register(
             error = "Expected two 16-bit registers";
             return false;
         }
-        int sourceId = sourceReg->getGroupId();
-        int destId = destReg->getGroupId();
+       
         if (sourceId < 8 && destId < 8)
         {
 
@@ -207,6 +208,15 @@ bool X86Encoder::encode_register(
             error = "Expected two 32-bit registers";
             return false;
         }
+        if(sourceId >= 8 || destId >= 8)
+        {
+            error = "Unsupported 32-bit register encoding";
+            return false;
+        }
+        bytes.push_back({0x89});
+        bytes.push_back({static_cast<std::uint8_t>(0xC0 | (sourceId << 3) | destId)});
+        
+        return true;
     }
     break;
     case X86Mode::Bits64:
@@ -217,6 +227,16 @@ bool X86Encoder::encode_register(
             error = "Expected two 64-bit registers";
             return false;
         }
+        if(sourceId >= 8 || destId >= 8)
+        {
+            error = "Unsupported 64-bit register encoding";
+            return false;
+        }
+        bytes.push_back({0x48}); // REX.W prefix for 64-bit operand
+        bytes.push_back({0x89});
+        bytes.push_back({static_cast<std::uint8_t>(0xC0 | (sourceId << 3) | destId)});
+        return true;
+
     }
     break;
     default:
