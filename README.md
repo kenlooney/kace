@@ -48,6 +48,8 @@ assembly concepts.
   statement data stored in its own derived class
 - x86 plugin API encoding and decoding of supported register-immediate moves,
   including mode-aware operand sizes
+- x86 plugin API encoding and decoding of register-to-register moves in 16-,
+  32-, and 64-bit modes for the first eight register groups
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
 - Label recognition, offset recording, and short- and near-jump fixups, plus a symbol
   table with save/load helpers
@@ -281,7 +283,7 @@ should be divided is an open part of the design. Assemblers consuming other
 statement types need to handle those types explicitly, and plugins must be
 rebuilt against the matching framework interface.
 
-### Registers and immediate moves
+### Registers and moves
 
 The framework exposes a CPU's `RegisterFile` through the `Cpu` interface.
 Plugins can define architecture-specific register information without putting
@@ -305,17 +307,33 @@ the first eight 16-, 32-, and 64-bit register groups. It interprets operand
 size according to the selected mode, the `66` override, and `48` for the
 64-bit form. For example, in 64-bit mode `48 B8 78 56 34 12 00 00 00 00`
 decodes to `mov rax, 305419896`. Other REX prefixes and extended registers
-are not yet supported by this decoder. The encoder's 64-bit branch is still
-in progress: its width lookup does not yet recognize primary names such as
-`rax`.
+are not yet supported by this decoder. The immediate encoder also supports
+64-bit primary registers such as `rax` in 64-bit mode for the first eight
+register groups.
 
 The x86 assembler also calls this encoder for parsed immediate `mov`
 statements. For example, `mov cx, 0x1234` in the default 16-bit mode produces
-`B9 34 12` through the KASM CLI. Register-to-register and memory move forms
-are not yet implemented. Expanding instruction, register, and prefix support
-remains future work.
+`B9 34 12` through the KASM CLI.
 
-The x86 plugin can decode `nop`, supported register-immediate moves, short
+The x86 plugin's encoder and decoder also support register-to-register moves
+for the first eight general-purpose register groups. The current encoder
+supports the native-width form in each mode:
+
+| CPU mode | Example | Encoded bytes |
+|----------|---------|---------------|
+| 16-bit | `mov ax, bx` | `89 D8` |
+| 32-bit | `mov eax, ebx` | `89 D8` |
+| 64-bit | `mov rax, rbx` | `48 89 D8` |
+
+The `89` opcode is followed by a ModR/M byte that identifies the source and
+destination; the `48` prefix selects a 64-bit operand. In 64-bit mode, the
+decoder also reads unprefixed `89 D8` as `mov eax, ebx`. The register-move
+encoder is not yet connected to KASM source parsing or the assembler, so the
+examples above describe the plugin API and decoder, not CLI assembly. Memory
+operands, extended registers (`r8`–`r15`), and additional operand-size and REX
+prefix forms remain future work for register moves.
+
+The x86 plugin can decode `nop`, supported register-immediate and register-to-register moves, short
 unconditional and conditional jumps, mode-aware near jumps, and 16-bit far jumps.
 To disassemble an existing binary into a text
 file, run:
@@ -363,8 +381,8 @@ The test suite covers source loading, diagnostics, lexing, expression and
 statement parsing, CLI output, CPU plugins, x86 encoding and decoding, and
 symbol table persistence. The CLI tests also cover jumps, position-based
 padding, nested includes, and position assertions, including failure cases. The
-x86 plugin tests cover register aliases, immediate encodings, mode-aware
-immediate decoding and truncated input, conditional-jump encodings and
+x86 plugin tests cover register aliases, immediate and register-to-register
+encodings, mode-aware decoding and truncated input, conditional-jump encodings and
 fixups, near-jump widths, range limits, and fixups in all three modes.
 Use CTest's `-V` option to show output
 from passing tests, or select a test in CMake Tools' Test Explorer.
@@ -389,7 +407,8 @@ Planned development includes:
 - Far-jump support in additional CPU modes and broader label resolution
 - Near conditional jumps and conditional target restoration during disassembly
 - Mode-aware support for more instructions and disassembly mode selection
-- Register-to-register and memory moves, and broader disassembly support
+- KASM source assembly for register-to-register moves, memory moves, and broader
+  disassembly support
 - Completing the statement parsing contract and refining plugin language boundaries
 - More instructions, registers, and addressing modes
 - A complete KASM command-line workflow

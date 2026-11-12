@@ -14,6 +14,7 @@
  * GNU General Public License for more details.
  */
 #include <x86/x86.hpp>
+#include <x86/x86Registers.hpp>
 
 X86Mode X86Encoder::mode() const
 {
@@ -149,6 +150,103 @@ bool X86Encoder::encode_immediate(
     return false;
 }
 
+bool X86Encoder::encode_register(
+    const std::string &name,
+    const std::string &reg_dest,
+    const std::string &reg_source,
+    std::vector<std::vector<std::uint8_t>> &bytes,
+    std::string &error) const
+{
+    if (name != "mov")
+    {
+        error = "Unsupported register instruction";
+        return false;
+    }
+    X86Register *sourceReg = cpu_.registers().getRegisterByName(reg_source);
+    X86Register *destReg = cpu_.registers().getRegisterByName(reg_dest);
+    if (!sourceReg)
+    {
+        error = "Invalid source register";
+        return false;
+    }
+    if (!destReg)
+    {
+        error = "Invalid destination register";
+        return false;
+    }
+    X86Mode mode = cpu_.getMode();
+    int sourceId = sourceReg->getGroupId();
+    int destId = destReg->getGroupId();
+
+    switch (mode)
+    {
+    case X86Mode::Bits16:
+    {
+        // 16-bit mode encoding logic here
+        if (!destReg->hasWidth(reg_dest, 16) || !sourceReg->hasWidth(reg_source, 16))
+        {
+            error = "Expected two 16-bit registers";
+            return false;
+        }
+       
+        if (sourceId < 8 && destId < 8)
+        {
+
+            bytes.push_back({0x89});
+            bytes.push_back({static_cast<std::uint8_t>(0xC0 | (sourceId << 3) | destId)});
+            return true;
+        }
+        error = "Unsupported 16-bit register encoding";
+        return false;
+    }
+    break;
+    case X86Mode::Bits32:
+    {
+        // 32-bit mode encoding logic here
+        if (!destReg->hasWidth(reg_dest, 32) || !sourceReg->hasWidth(reg_source, 32))
+        {
+            error = "Expected two 32-bit registers";
+            return false;
+        }
+        if(sourceId >= 8 || destId >= 8)
+        {
+            error = "Unsupported 32-bit register encoding";
+            return false;
+        }
+        bytes.push_back({0x89});
+        bytes.push_back({static_cast<std::uint8_t>(0xC0 | (sourceId << 3) | destId)});
+        
+        return true;
+    }
+    break;
+    case X86Mode::Bits64:
+    {
+        // 64-bit mode encoding logic here
+        if (!destReg->hasWidth(reg_dest, 64) || !sourceReg->hasWidth(reg_source, 64))
+        {
+            error = "Expected two 64-bit registers";
+            return false;
+        }
+        if(sourceId >= 8 || destId >= 8)
+        {
+            error = "Unsupported 64-bit register encoding";
+            return false;
+        }
+        bytes.push_back({0x48}); // REX.W prefix for 64-bit operand
+        bytes.push_back({0x89});
+        bytes.push_back({static_cast<std::uint8_t>(0xC0 | (sourceId << 3) | destId)});
+        return true;
+
+    }
+    break;
+    default:
+        error = "Unsupported register instruction encoding";
+        return false;
+    }
+    error = "Unsupported register instruction encoding";
+    return false;
+}
+
 bool X86Encoder::encode_near_jump(
     std::int64_t displacement, std::vector<std::uint8_t> &bytes,
     std::string &error) const
@@ -208,7 +306,6 @@ bool X86Encoder::encode_conditional_jump(
     std::string &error) const
 {
     std::uint8_t opcode = 0;
-
 
     if (condition == "jz")
         opcode = 0x74; // jz short

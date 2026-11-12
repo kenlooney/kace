@@ -52,7 +52,14 @@ bool X86Decoder::decode(
     case 0x66:
         return decode_immediate(bytes, offset, text);
     case 0x48:
-        return mode() == X86Mode::Bits64 && decode_immediate(bytes, offset, text);
+    {
+        if (mode() != X86Mode::Bits64 || bytes.size() - offset < 2)
+            return false;
+        if (bytes[offset + 1] == 0x89)
+            return decode_register(bytes, offset, text);
+
+        return decode_immediate(bytes, offset, text);
+    }
     case 0xEB:
         return decode_short_jump(bytes, offset, text);
     case 0xE9:
@@ -64,6 +71,8 @@ bool X86Decoder::decode(
     case 0x72:
     case 0x73:
         return decode_conditional_jump(bytes, offset, text);
+    case 0x89:
+        return decode_register(bytes, offset, text);
 
     default:
         return false;
@@ -211,6 +220,84 @@ bool X86Decoder::decode_immediate(const std::vector<std::uint8_t> &bytes, std::s
         return false;
     }
 }
+
+bool X86Decoder::decode_register(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+{
+    bool hasRexW = false;
+    std::size_t opcodeOffset = offset;
+
+    if (offset >= bytes.size() || bytes.size() - offset < 2)
+        return false;
+
+    if (mode() == X86Mode::Bits64)
+    {
+
+        if (mode() == X86Mode::Bits64 && bytes[offset] == 0x48)
+        {
+            if (bytes.size() - offset < 3)
+                return false;
+            hasRexW = true;
+            opcodeOffset = offset + 1;
+        }
+    }
+    if (mode() != X86Mode::Bits16 &&
+        mode() != X86Mode::Bits32 &&
+        mode() != X86Mode::Bits64)
+        return false;
+
+    if (bytes[opcodeOffset] != 0x89)
+        return false;
+
+    // Read ModR/M byte and check its top two bits
+    std::uint8_t modrm = bytes[opcodeOffset + 1];
+
+    if ((modrm & 0xC0) != 0xC0)
+        return false;
+
+    const unsigned reg_source = (modrm >> 3) & 0x07;
+    const unsigned reg_dest = modrm & 0x07;
+
+    // Find both source and destination registers by their IDs
+    const X86Register *src = cpu_.registers().getRegisterById(reg_source);
+    const X86Register *dst = cpu_.registers().getRegisterById(reg_dest);
+
+    // If either source or destination register is not found, decoding fails
+    if (!src || !dst)
+        return false;
+
+    // Get names
+    const std::string *sourceName = nullptr;
+    const std::string *destName = nullptr;
+    if (mode() == X86Mode::Bits16)
+    {
+        sourceName = src->getAliasByWidth(16);
+        destName = dst->getAliasByWidth(16);
+    }
+    else if (mode() == X86Mode::Bits32)
+    {
+        sourceName = src->getAliasByWidth(32);
+        destName = dst->getAliasByWidth(32);
+    }
+    else if (mode() == X86Mode::Bits64)
+    {
+        unsigned width = hasRexW ? 64 : 32;
+        sourceName = src->getAliasByWidth(width);
+        destName = dst->getAliasByWidth(width);
+    }
+    else
+        return false;
+
+    if (!sourceName || !destName)
+        return false;
+
+    // Advance offset past the opcode and ModR/M byte
+    offset = opcodeOffset + 2;
+
+    text = "mov " + *destName + ", " + *sourceName;
+
+    return true;
+}
+
 bool X86Decoder::decode_short_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
     std::int64_t displacement = 0;

@@ -207,10 +207,15 @@ byte 3</code></pre>
               <li>
                 <div><strong>x86</strong><span>DEFAULT CPU</span></div>
                 <p>The assembler supports <code>nop</code>, short unconditional and conditional jumps, mode-aware near jumps, and 16-bit far jumps. The CLI can disassemble
-                  supported immediate moves and those jump forms. Conditional jumps disassemble with numeric displacements.</p>
+                  supported immediate moves, register-to-register moves, and those jump forms. Conditional jumps disassemble with numeric displacements.</p>
                 <p>Source statements <code>code16</code>, <code>code32</code>, and <code>code64</code> select the mode for subsequent near-jump assembly. Near jumps use a 16-bit displacement in 16-bit mode and a 32-bit displacement in 32- and 64-bit modes. The binary does not record mode changes for disassembly.</p>
                 <p>The x86 register file groups overlapping names such as <code>rax</code>, <code>eax</code>, <code>ax</code>, <code>al</code>, and <code>ah</code>. The framework exposes register files while the plugin supplies x86-specific widths and encoding IDs.</p>
                 <p>The assembler supports immediate moves to <code>al</code>, <code>cl</code>, <code>dl</code>, <code>bl</code>, <code>ah</code>, <code>ch</code>, <code>dh</code>, and <code>bh</code>, and the first eight 16- and 32-bit register groups. For example, in 16-bit mode <code>mov cx, 0x1234</code> encodes as <code>B9 34 12</code>. The decoder supports those 8-bit moves and the first eight 16-, 32-, and 64-bit register groups; broader register and prefix support is still in progress.</p>
+                <p>The x86 plugin can encode and decode register-to-register moves for the first eight register groups. Its native-width examples are:</p>
+                <pre class="directive-example"><code>16-bit: mov ax, bx   → 89 D8
+32-bit: mov eax, ebx → 89 D8
+64-bit: mov rax, rbx → 48 89 D8</code></pre>
+                <p>These register-to-register encodings are available through the plugin API; KASM source assembly for them is still being developed. Extended registers and memory operands are not yet supported for this form.</p>
               </li>
             </ul>
             <p class="plugin-note">Select the included plugin with <code>--cpu=x86</code> or <code>-c x86</code>. x86 is
