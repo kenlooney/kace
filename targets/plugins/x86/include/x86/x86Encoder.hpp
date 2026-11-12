@@ -33,6 +33,13 @@ public:
         std::vector<std::vector<std::uint8_t>>& bytes,
         std::string& error
     ) const;
+    virtual bool encode_register(
+        const std::string& name,
+        const std::string& reg_dest,
+        const std::string& reg_source,
+        std::vector<std::vector<std::uint8_t>>& bytes,
+        std::string& error
+    ) const;
     bool encode_short_jump(
         std::int64_t displacement,
         std::vector<std::uint8_t>& bytes,

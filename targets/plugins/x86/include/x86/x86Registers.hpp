@@ -94,6 +94,16 @@ public:
         }
         return false;
     }
+    const std::string *getAliasByWidth(unsigned width) const
+    {
+        for (const auto &alias : aliases_)
+        {
+            if (alias.width == width && alias.shift == 0)
+                return &alias.name;
+        }
+        return nullptr;
+    }
+    unsigned getId() const { return id_; }
 
 private:
     unsigned id_;
@@ -124,10 +134,35 @@ public:
     {
         return dynamic_cast<X86Register *>(RegisterFile::getRegisterByName(name));
     }
+
     const X86Register *getRegisterByName(const std::string &name) const
     {
         return dynamic_cast<const X86Register *>(RegisterFile::getRegisterByName(name));
     }
+    const X86Register *getRegisterById(unsigned id)
+    {
+        X86RegisterFile *file = this;
+        for (const auto &org : file->getRegisters())
+        {
+            X86Register *reg = dynamic_cast<X86Register *>(org.get());
+            if (reg && reg->getId() == id)
+                return reg;
+        }
+        return nullptr;
+    }
+
+    const X86Register *getRegisterById(unsigned id) const
+    {
+        const X86RegisterFile *file = this;
+        for (const auto &org : file->getRegisters())
+        {
+            const X86Register *reg = dynamic_cast<const X86Register *>(org.get());
+            if (reg && reg->getId() == id)
+                return reg;
+        }
+        return nullptr;
+    }
+
     bool getRegisterValue(const std::string &name, std::uint64_t &result) const
     {
         const X86Register *reg = getRegisterByName(name);

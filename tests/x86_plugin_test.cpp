@@ -37,6 +37,20 @@ bool test_register_file() {
         std::cerr << "Register encoding IDs are incorrect\n";
         return false;
     }
+    const char* groupNames[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi",
+                                "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"};
+    for (unsigned id = 0; id < 16; ++id) {
+        const auto* reg = registers.getRegisterById(id);
+        if (!reg || reg != registers.getRegisterByName(groupNames[id])) {
+            std::cerr << "Register group lookup failed for ID " << id << '\n';
+            return false;
+        }
+    }
+    registers.addRegister(std::make_unique<Register>("other"));
+    if (registers.getRegisterById(16) != nullptr) {
+        std::cerr << "Unknown register group ID was accepted\n";
+        return false;
+    }
     const Cpu& generic = cpu;
     if (generic.registers().getRegisterByName("al") != rax) {
         std::cerr << "CPU interface did not expose the x86 register file\n";
@@ -46,6 +60,53 @@ bool test_register_file() {
     if (!other.registers().getRegisterValue("rax", value) || value != 0) {
         std::cerr << "CPU register files share state\n";
         return false;
+    }
+    return true;
+}
+
+bool test_register_move_encoding() {
+    X86 cpu;
+    cpu.setMode(X86Mode::Bits16);
+    struct MoveCase { const char* dest; const char* source; std::uint8_t modrm; };
+    for (const auto& test : {MoveCase{"ax", "bx", 0xD8}, {"bx", "ax", 0xC3},
+                             {"cx", "dx", 0xD1}, {"di", "si", 0xF7},
+                             {"sp", "sp", 0xE4}}) {
+        std::vector<std::vector<std::uint8_t>> bytes;
+        std::string error;
+        if (!cpu.encoder()->encode_register("mov", test.dest, test.source, bytes, error) ||
+            bytes != std::vector<std::vector<std::uint8_t>>{{0x89}, {test.modrm}}) {
+            std::cerr << "Register move encoding failed for " << test.dest << ", "
+                      << test.source << ": " << error << '\n';
+            return false;
+        }
+        const std::vector<std::uint8_t> encoded{0x90, 0x89, test.modrm};
+        std::size_t offset = 1;
+        std::string decoded;
+        if (!cpu.decoder()->decode(encoded, offset, decoded) || offset != encoded.size() ||
+            decoded != std::string("mov ") + test.dest + ", " + test.source) {
+            std::cerr << "Register move decoding failed for " << test.dest << ", "
+                      << test.source << " (offset " << offset << ", text '" << decoded << "')\n";
+            return false;
+        }
+    }
+    for (const std::vector<std::uint8_t> invalid :
+         {std::vector<std::uint8_t>{0x89}, std::vector<std::uint8_t>{0x89, 0x00}}) {
+        std::size_t offset = 0;
+        std::string decoded;
+        if (cpu.decoder()->decode(invalid, offset, decoded) || offset != 0) {
+            std::cerr << "Incomplete or memory register move accepted\n";
+            return false;
+        }
+    }
+    for (const auto& test : {MoveCase{"ax", "al", 0}, {"r8w", "ax", 0},
+                             {"ax", "r9w", 0}, {"unknown", "ax", 0}}) {
+        std::vector<std::vector<std::uint8_t>> bytes{{0x90}};
+        std::string error;
+        if (cpu.encoder()->encode_register("mov", test.dest, test.source, bytes, error) ||
+            bytes != std::vector<std::vector<std::uint8_t>>{{0x90}} || error.empty()) {
+            std::cerr << "Invalid register move accepted\n";
+            return false;
+        }
     }
     return true;
 }
@@ -226,6 +287,7 @@ bool test_near_modes() {
 
 int main() {
     if (!test_register_file()) return 1;
+    if (!test_register_move_encoding()) return 1;
     if (!test_conditional_jumps()) return 1;
     if (!test_conditional_fixups()) return 1;
     if (!test_near_modes()) return 1;

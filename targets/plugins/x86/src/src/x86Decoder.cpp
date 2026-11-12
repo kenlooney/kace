@@ -64,6 +64,8 @@ bool X86Decoder::decode(
     case 0x72:
     case 0x73:
         return decode_conditional_jump(bytes, offset, text);
+    case 0x89:
+        return decode_register(bytes, offset, text);
 
     default:
         return false;
@@ -211,6 +213,47 @@ bool X86Decoder::decode_immediate(const std::vector<std::uint8_t> &bytes, std::s
         return false;
     }
 }
+
+bool X86Decoder::decode_register(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+{
+    if (offset >= bytes.size() || bytes.size() - offset < 2)
+        return false;
+
+    if (mode() != X86Mode::Bits16 || bytes[offset] != 0x89)
+    return false;
+
+    // Read ModR/M byte and check its top two bits
+    std::uint8_t modrm = bytes[offset + 1];
+
+    if((modrm & 0xC0) != 0xC0)
+        return false;
+
+    const unsigned reg_source = (modrm >> 3) & 0x07;
+    const unsigned reg_dest = modrm & 0x07;
+
+    // Find both source and destination registers by their IDs
+    const X86Register *src = cpu_.registers().getRegisterById(reg_source);
+    const X86Register *dst = cpu_.registers().getRegisterById(reg_dest);
+
+    // If either source or destination register is not found, decoding fails
+    if (!src || !dst)
+        return false;
+
+    
+    // Get names
+    const std::string *sourceName = src->getAliasByWidth(16);
+    const std::string *destName = dst->getAliasByWidth(16);
+    if (!sourceName || !destName)
+        return false;
+
+    // Advance offset past the opcode and ModR/M byte
+    offset += 2;
+    
+    text = "mov " + *destName + ", " + *sourceName;
+
+    return true;
+}
+
 bool X86Decoder::decode_short_jump(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {
     std::int64_t displacement = 0;
