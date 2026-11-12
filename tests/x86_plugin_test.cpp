@@ -1,5 +1,6 @@
 #include <x86/x86.hpp>
 #include <kasm/kasmstatement.hpp>
+#include <kasm/kasmparser.hpp>
 
 #include <cstdint>
 #include <iostream>
@@ -243,6 +244,48 @@ bool test_conditional_jumps() {
     return true;
 }
 
+bool test_source_byte_ranges() {
+    const std::vector<Token> tokens;
+    KasmParser parser(tokens);
+    Source source{"ranges.asm", "start:\n  jz done\n nop\nbyte 0x55\ndone:\n times 2 byte 0\n"};
+    std::vector<std::unique_ptr<Statement>> statements;
+    std::string error;
+    if (!parser.parse(source, statements, error)) {
+        std::cerr << "Source range test parsing failed: " << error << '\n';
+        return false;
+    }
+    X86 cpu;
+    std::vector<std::uint8_t> bytes;
+    SymbolTable symbols;
+    if (!cpu.assembler()->assemble(statements, bytes, symbols, error) ||
+        bytes != std::vector<std::uint8_t>{0x74, 0x02, 0x90, 0x55, 0x00, 0x00}) {
+        std::cerr << "Source range test assembly failed: " << error << '\n';
+        return false;
+    }
+    const auto& ranges = symbols.getByteRanges();
+    const std::vector<SymbolByteRange> expected{
+        {0, 2, "ranges.asm", 2, 3}, {2, 1, "ranges.asm", 3, 2},
+        {3, 1, "ranges.asm", 4, 1}, {4, 2, "ranges.asm", 6, 2}};
+    if (ranges.size() != expected.size()) {
+        std::cerr << "Unexpected number of source byte ranges\n";
+        return false;
+    }
+    for (std::size_t i = 0; i < ranges.size(); ++i) {
+        if (ranges[i].offset != expected[i].offset || ranges[i].length != expected[i].length ||
+            ranges[i].sourceName != expected[i].sourceName || ranges[i].line != expected[i].line ||
+            ranges[i].column != expected[i].column) {
+            std::cerr << "Incorrect source byte range at index " << i << '\n';
+            return false;
+        }
+    }
+    symbols.clear();
+    if (!symbols.getByteRanges().empty() || symbols.symbolCount() != 0) {
+        std::cerr << "Clearing symbols did not clear source byte ranges\n";
+        return false;
+    }
+    return true;
+}
+
 bool test_conditional_fixups() {
     X86 cpu;
     std::vector<std::unique_ptr<Statement>> statements;
@@ -365,6 +408,7 @@ int main() {
     if (!test_register_file()) return 1;
     if (!test_register_move_encoding()) return 1;
     if (!test_conditional_jumps()) return 1;
+    if (!test_source_byte_ranges()) return 1;
     if (!test_conditional_fixups()) return 1;
     if (!test_near_modes()) return 1;
     X86 x86;

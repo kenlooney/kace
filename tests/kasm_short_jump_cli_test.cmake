@@ -50,7 +50,7 @@ message(STATUS "Forward and backward near jumps: E9 01 00 90 E9 F9 FF")
 file(WRITE "${input}" "same:\nnop\nsame:\n")
 execute_process(COMMAND "${KASM}" --cpu=x86 -i "${input}" -o "${output}"
   RESULT_VARIABLE result ERROR_VARIABLE error)
-if(result EQUAL 0 OR NOT error MATCHES ":3: Duplicate label: same")
+if(result EQUAL 0 OR NOT error MATCHES ":3:1: Duplicate label: same.*first defined at .*:1:1")
   message(FATAL_ERROR "Expected a duplicate-label error: ${error}")
 endif()
 file(REMOVE "${input}" "${output}" "${TEST_DIR}/short_jump_output.sym")

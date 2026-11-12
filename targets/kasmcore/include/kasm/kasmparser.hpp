@@ -75,7 +75,7 @@ public:
         std::istringstream input(source.text);
         std::string line;
         std::size_t line_number = 0;
-
+       
         while (std::getline(input, line))
         {
             ++line_number;
@@ -90,6 +90,8 @@ public:
             KasmStatement statement;
             statement.line = line_number;
             statement.sourceName = source.name;
+            statement.column = tokens[0].span.begin + 1;
+            
 
             // Check for code segment keywords like "code16", "code32", "code64" before identifiers
             if (tokens[0].kind == "identifier" &&

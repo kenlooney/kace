@@ -52,6 +52,15 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
         }
         const KasmStatement &statement = *kasmStatement;
         const std::size_t offset = output.size();
+        auto recordBytes = [&]()
+        {
+            const std::size_t length = output.size() - offset;
+            if (length != 0)
+            {
+                labels.addByteRange({offset, length,
+                                     statement.sourceName, statement.line, statement.column});
+            }
+        };
 
         if (statement.has_kind("CodeSegment"))
         {
@@ -81,8 +90,22 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
         }
         if (statement.has_kind("Label"))
         {
-            if (!labels.addLabel(statement.name(), offset))
-                return fail(statement, "Duplicate label: " + statement.name());
+
+            if (!labels.addLabel(statement.name(), offset,
+                                 statement.sourceName, statement.line, statement.column))
+            {
+                const Symbol *first = labels.getSymbol(statement.name());
+                error = statement.sourceName + ":" +
+                        std::to_string(statement.line) + ":" +
+                        std::to_string(statement.column) +
+                        ": Duplicate label: " + statement.name() +
+                        " (first defined at " + first->sourceName + ":" +
+                        std::to_string(first->line) + ":" +
+                        std::to_string(first->column) + ")";
+
+                return false;
+            }
+
             continue;
         }
 
@@ -92,6 +115,8 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
                                JumpKind::Short, statement.sourceName, statement.name()},
                               current_mode});
             output.insert(output.end(), 2, 0);
+            //NEW
+            recordBytes();
             continue;
         }
 
@@ -107,6 +132,7 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
                                near ? JumpKind::Near : JumpKind::Short, statement.sourceName},
                               current_mode});
             output.insert(output.end(), 1 + displacementSize, 0);
+            recordBytes();
             continue;
         }
 
@@ -116,6 +142,7 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             if (!cpu_.encoder()->encode_far_jump(statement.farSegment, statement.farOffset, encoded, error))
                 return fail(statement, error);
             output.insert(output.end(), encoded.begin(), encoded.end());
+            recordBytes();
             continue;
         }
         if (statement.name() == "mov")
@@ -141,6 +168,8 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             {
                 output.insert(output.end(), part.begin(), part.end());
             }
+            //NEW
+            recordBytes();
             continue;
         }
         std::uint8_t byte = 0;
@@ -156,6 +185,8 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             if (count > 1000000)
                 return fail(statement, "Repeat count exceeds the limit");
             output.insert(output.end(), static_cast<std::size_t>(count), byte);
+            //NEW
+            recordBytes();
             continue;
         }
         if (statement.type != DataType::None)
@@ -167,7 +198,9 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
         {
             return fail(statement, "Unsupported instruction or operands: " + statement.name());
         }
+        //NEW
         output.push_back(byte);
+         recordBytes();
     }
     std::cout << "First pass complete" << std::endl;
     if (output.size() > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()))

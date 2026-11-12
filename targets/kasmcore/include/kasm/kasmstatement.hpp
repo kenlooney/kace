@@ -45,6 +45,7 @@ public:
     std::size_t offset = 0;
     std::uint64_t count = 0;
     Expression countExpression;
+    std::size_t column = 0;
     bool parse_statement(const std::vector<Token> &tokens, std::string &error) override
     {
         return false;

@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <vector>
 #include <fstream>
+#include <iomanip>
 
 enum class SymbolKind {
     Label,
@@ -26,10 +27,22 @@ enum class SymbolKind {
     Directive
 };
 
+struct SymbolByteRange {
+    std::size_t offset = 0;
+    std::size_t length = 0;
+    std::string sourceName;
+    std::size_t line = 0;
+    std::size_t column = 0;
+};
+
 struct Symbol {
     std::string name;
     SymbolKind kind;
     std::size_t offset = 0;
+    std::string sourceName;
+    std::size_t line = 0;
+    std::size_t column = 0;
+
 };
 
 class SymbolTable {
@@ -56,6 +69,7 @@ public:
     }
     void clear() {
         symbols.clear();
+        byteRanges.clear();
     }
     std::vector<std::string> getSymbolNames() const {
         std::vector<std::string> names;
@@ -101,18 +115,18 @@ public:
         return result;
     }
 
-    bool addLabel(const std::string& name, std::size_t offset = 0) {
+    bool addLabel(const std::string& name, std::size_t offset = 0, std::string sourceName = "", std::size_t line = 0, std::size_t column = 0) {
         if (hasSymbol(name)) {
             return false;
         }
-        addSymbol({name, SymbolKind::Label, offset});
+        addSymbol({name, SymbolKind::Label, offset, sourceName, line, column});
         return true;
     }
     bool addInstruction(const std::string& name, std::size_t offset = 0) {
         if (hasSymbol(name)) {
             return false;
         }
-        addSymbol({name, SymbolKind::Instruction, offset});
+        addSymbol({name, SymbolKind::Instruction, offset, "", 0, 0});
         return true;
     }
 
@@ -120,7 +134,7 @@ public:
         if (hasSymbol(name)) {
             return false;
         }
-        addSymbol({name, SymbolKind::Directive, offset});
+        addSymbol({name, SymbolKind::Directive, offset, "", 0, 0});
         return true;
     }
     bool save_to_file(const std::string& filename) const {
@@ -128,8 +142,16 @@ public:
         if (!file.is_open()) {
             return false;
         }
+        file << "KACE-SYM 2\n";
         for (const auto& pair : symbols) {
-            file << pair.first << " " << static_cast<int>(pair.second.kind) << " " << pair.second.offset << "\n";
+            const Symbol& symbol = pair.second;
+            file << "symbol " << std::quoted(symbol.name) << " " << static_cast<int>(symbol.kind)
+                 << " " << symbol.offset << " " << std::quoted(symbol.sourceName)
+                 << " " << symbol.line << " " << symbol.column << "\n";
+        }
+        for (const auto& range : byteRanges) {
+            file << "bytes " << range.offset << " " << range.length << " "
+                 << std::quoted(range.sourceName) << " " << range.line << " " << range.column << "\n";
         }
         file.close();
         return static_cast<bool>(file);
@@ -140,6 +162,41 @@ public:
             return false;
         }
         SymbolTable loaded;
+        std::string header;
+        std::getline(file, header);
+        if (!header.empty() && header.back() == '\r') header.pop_back();
+        if (header == "KACE-SYM 2") {
+            while (true) {
+                file >> std::ws;
+                if (file.eof()) break;
+                if (!file) return false;
+                std::string record;
+                if (!(file >> record)) return false;
+                if (record == "symbol") {
+                    Symbol symbol;
+                    int kindInt;
+                    if (!(file >> std::quoted(symbol.name) >> kindInt >> symbol.offset >>
+                          std::quoted(symbol.sourceName) >> symbol.line >> symbol.column) ||
+                        kindInt < static_cast<int>(SymbolKind::Label) ||
+                        kindInt > static_cast<int>(SymbolKind::Directive) ||
+                        symbol.name.empty() || loaded.hasSymbol(symbol.name)) return false;
+                    symbol.kind = static_cast<SymbolKind>(kindInt);
+                    loaded.addSymbol(symbol);
+                } else if (record == "bytes") {
+                    SymbolByteRange range;
+                    if (!(file >> range.offset >> range.length >> std::quoted(range.sourceName) >>
+                          range.line >> range.column)) return false;
+                    loaded.addByteRange(range);
+                } else {
+                    return false;
+                }
+            }
+            symbols.swap(loaded.symbols);
+            byteRanges.swap(loaded.byteRanges);
+            return true;
+        }
+        file.clear();
+        file.seekg(0);
         std::string name;
         int kindInt;
         std::size_t offset;
@@ -152,10 +209,34 @@ public:
         }
         if (!file.eof()) return false;
         symbols.swap(loaded.symbols);
+        byteRanges.swap(loaded.byteRanges);
         return true;
     }
+    // Accessor for byte ranges
+    const std::vector<SymbolByteRange>& getByteRanges() const {
+        return byteRanges;
+    }
+    // Mutator for byte ranges
+    void addByteRange(const SymbolByteRange& range) {
+        byteRanges.push_back(range);
+    }
+    void clearByteRanges() {
+        byteRanges.clear();
+    }
+    void removeByteRange(std::size_t index) {
+        if (index < byteRanges.size()) {
+            byteRanges.erase(byteRanges.begin() + index);
+        }
+    }
+    void updateByteRange(std::size_t index, const SymbolByteRange& range) {
+        if (index < byteRanges.size()) {
+            byteRanges[index] = range;
+        }
+    }
+
 
 private:
     std::unordered_map<std::string, Symbol> symbols;
+    std::vector<SymbolByteRange> byteRanges;
 };
 
