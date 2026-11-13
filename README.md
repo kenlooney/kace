@@ -52,6 +52,7 @@ assembly concepts.
   including mode-aware operand sizes
 - x86 plugin API encoding and decoding of register-to-register moves in 16-,
   32-, and 64-bit modes for the first eight register groups
+- x86 memory-to-register loads in 16-, 32-, and 64-bit modes, with KASM source support
 - Parsing of `mov`, `move`, and `copy` immediate expressions and registers
 - Label recognition, offset recording, and short- and near-jump fixups, plus a symbol
   table with save/load helpers
@@ -97,6 +98,26 @@ literal from 0 through 255; its meaning depends on the execution environment.
 Disassembly uses the canonical names `int` and `hlt`, and displays the vector
 in decimal. The `hlt` instruction requires appropriate CPU privileges at
 runtime and emits no operand.
+
+### Memory loads
+
+KASM can load from a register-based memory address into a register:
+
+```asm
+code16
+mov ax, [bx]     ; 8B 07
+code32
+mov eax, [ebx]   ; 8B 03
+code64
+mov rax, [rbx]   ; 48 8B 03
+```
+
+The first form supports `[bx]`, `[si]`, and `[di]`. The 32- and 64-bit
+forms support the first eight register groups as destinations and simple
+bases other than `[esp]`/`[rsp]` and `[ebp]`/`[rbp]`. Indexed addresses,
+displacements, extended registers, and memory stores are not yet supported.
+The x86 decoder handles these forms using its selected CPU mode; binaries do
+not record source-level mode changes for disassembly.
 
 ### Expression diagnostics
 
@@ -379,10 +400,10 @@ destination; the `48` prefix selects a 64-bit operand. In 64-bit mode, the
 decoder also reads unprefixed `89 D8` as `mov eax, ebx`. The register-move
 encoder is not yet connected to KASM source parsing or the assembler, so the
 examples above describe the plugin API and decoder, not CLI assembly. Memory
-operands, extended registers (`r8`–`r15`), and additional operand-size and REX
+loads are described above; extended registers (`r8`–`r15`), and additional operand-size and REX
 prefix forms remain future work for register moves.
 
-The x86 plugin can decode `nop`, `int`, `hlt`, supported register-immediate and register-to-register moves, short
+The x86 plugin can decode `nop`, `int`, `hlt`, supported register-immediate, register-to-register, and memory-load moves, short
 unconditional and conditional jumps, mode-aware near jumps, and 16-bit far jumps.
 To disassemble an existing binary into a text
 file, run:
@@ -461,7 +482,7 @@ Planned development includes:
 - Far-jump support in additional CPU modes and broader label resolution
 - Near conditional jumps and conditional target restoration during disassembly
 - Mode-aware support for more instructions and disassembly mode selection
-- KASM source assembly for register-to-register moves, memory moves, and broader
+- KASM source assembly for register-to-register moves, additional memory forms, and broader
   disassembly support
 - Completing the statement parsing contract and refining plugin language boundaries
 - More instructions, registers, and addressing modes
