@@ -412,6 +412,38 @@ int main() {
     if (!test_conditional_fixups()) return 1;
     if (!test_near_modes()) return 1;
     X86 x86;
+    {
+        std::vector<std::uint8_t> encoded{0x90};
+        std::string error;
+        if (!x86.encoder()->encode_interrupt("0x21", encoded, error) ||
+            encoded != std::vector<std::uint8_t>{0x90, 0xCD, 0x21}) {
+            std::cerr << "Software interrupt encoded incorrectly\n";
+            return 1;
+        }
+        for (const auto* invalid : {"256", "0x100", "nope"}) {
+            if (x86.encoder()->encode_interrupt(invalid, encoded, error) ||
+                encoded != std::vector<std::uint8_t>{0x90, 0xCD, 0x21}) {
+                std::cerr << "Invalid software interrupt was accepted or changed output\n";
+                return 1;
+            }
+        }
+    }
+    {
+        const std::vector<std::uint8_t> instruction{0x90, 0xCD, 0x21};
+        std::size_t position = 1;
+        std::string decoded;
+        if (!x86.decoder()->decode(instruction, position, decoded) ||
+            position != 3 || decoded != "int 33") {
+            std::cerr << "Software interrupt decoded incorrectly\n";
+            return 1;
+        }
+        const std::vector<std::uint8_t> truncated{0x90, 0xCD};
+        position = 1;
+        if (x86.decoder()->decode(truncated, position, decoded) || position != 1) {
+            std::cerr << "Truncated software interrupt was accepted\n";
+            return 1;
+        }
+    }
     std::uint8_t byte = 0;
 
     if (!x86.encoder()->encode_no_operand("nop", byte) || byte != 0x90) {

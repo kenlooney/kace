@@ -73,6 +73,8 @@ bool X86Decoder::decode(
         return decode_conditional_jump(bytes, offset, text);
     case 0x89:
         return decode_register(bytes, offset, text);
+    case 0xCD:
+        return decode_interrupt(bytes, offset, text);
 
     default:
         return false;
@@ -397,4 +399,14 @@ bool X86Decoder::decode_far_jump(const std::vector<std::uint8_t> &bytes, std::si
         return true;
     }
     return false;
+}
+
+bool X86Decoder::decode_interrupt(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+{
+    if (offset >= bytes.size() || bytes[offset] != 0xCD || bytes.size() - offset < 2)
+        return false;
+    std::uint8_t intNum = bytes[offset + 1];
+    offset += 2;
+    text = "int " + std::to_string(intNum);
+    return true;
 }

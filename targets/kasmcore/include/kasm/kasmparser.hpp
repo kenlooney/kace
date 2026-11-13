@@ -64,6 +64,7 @@ public:
         keywords_table.addto_alias("jnz", "ifnotequal");
         keywords_table.addto_alias("jc", "ifcarry");
         keywords_table.addto_alias("jnc", "ifnotcarry");
+        keywords_table.addto_alias("int", "interrupt");
     }
 
     bool parse(
@@ -108,6 +109,8 @@ public:
                 statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
+
+           
 
             // Check for directives before identifiers
             if (tokens[0].kind == "directive")
@@ -312,6 +315,20 @@ public:
                 continue;
             }
 
+             // Check for interrupt keyword before identifiers
+            if (statement.name() == "int")
+            {
+                if (tokens.size() != 2)
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Unexpected tokens after interrupt declaration";
+                    return false;
+                }
+                statement.add_kind("Interrupt");
+                statement.interruptNumber = tokens[1].text;
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
+                continue;
+            }
             if (statement.name() == "mov")
             {
                 statement.moveKind = MoveKind::ImmediateToRegister;

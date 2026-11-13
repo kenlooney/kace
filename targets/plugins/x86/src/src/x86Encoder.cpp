@@ -15,6 +15,7 @@
  */
 #include <x86/x86.hpp>
 #include <x86/x86Registers.hpp>
+#include <kace/integers.hpp>
 
 X86Mode X86Encoder::mode() const
 {
@@ -329,6 +330,33 @@ bool X86Encoder::encode_conditional_jump(
 
     bytes.push_back(opcode);
     bytes.push_back(static_cast<std::uint8_t>(displacement));
+    error.clear();
+    return true;
+}
+
+bool X86Encoder::encode_interrupt(
+    const std::string &interruptNumber,
+    std::vector<std::uint8_t> &bytes,
+    std::string &error) const
+{
+    if (interruptNumber.empty())
+    {
+        error = "Interrupt number is required";
+        return false;
+    }
+    std::uint64_t intNum = 0;
+    if (!parse_integer(interruptNumber, intNum))
+    {
+        error = "Invalid interrupt number";
+        return false;
+    }
+    if (intNum > 255)
+    {
+        error = "Interrupt number must fit in 8 bits";
+        return false;
+    }
+    bytes.push_back(0xCD); // INT opcode
+    bytes.push_back(static_cast<std::uint8_t>(intNum));
     error.clear();
     return true;
 }

@@ -64,6 +64,12 @@ public:
         std::vector<std::uint8_t>& bytes,
         std::string& error
     ) const;
+
+    bool encode_interrupt(
+        const std::string& interruptNumber,
+        std::vector<std::uint8_t>& bytes,
+        std::string& error
+    ) const;
 private:
     X86& cpu_;
 };

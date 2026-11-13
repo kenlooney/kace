@@ -136,6 +136,16 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             continue;
         }
 
+        if (statement.has_kind("Interrupt"))
+        {
+            std::vector<std::uint8_t> encoded;
+            if (!cpu_.encoder()->encode_interrupt(statement.interruptNumber, encoded, error))
+                return fail(statement, error);
+            output.insert(output.end(), encoded.begin(), encoded.end());
+            recordBytes();
+            continue;
+        }
+
         if (statement.has_kind("JumpFar"))
         {
             std::vector<std::uint8_t> encoded;
