@@ -112,10 +112,25 @@ code64
 mov rax, [rbx]   ; 48 8B 03
 ```
 
-The first form supports `[bx]`, `[si]`, and `[di]`. The 32- and 64-bit
+The 16-bit form supports `[bx]`, `[si]`, and `[di]`. The 32- and 64-bit
 forms support the first eight register groups as destinations and simple
-bases other than `[esp]`/`[rsp]` and `[ebp]`/`[rbp]`. Indexed addresses,
-displacements, extended registers, and memory stores are not yet supported.
+bases, including `[esp]` and `[rsp]`, except `[ebp]` and `[rbp]`.
+
+In 32- and 64-bit modes, a memory load can also use a base plus a scaled index:
+
+```asm
+code32
+mov eax, [ebx + ecx * 4]       ; 8B 04 8B
+move eax, [ebx sum (ecx mul 4)] ; same bytes
+code64
+mov rax, [rbx + rcx * 4]       ; 48 8B 04 8B
+```
+
+The supported expression shape is `base + index * scale`, with scale 1, 2, 4,
+or 8. Parentheses around the scaled index work, but `[(ebx + ecx) * 4]` is
+not currently supported. The index cannot be `esp`/`rsp`, and `ebp`/`rbp`
+cannot be the base in this form. Displacements, extended registers, other
+address expression shapes, and memory stores are not yet supported.
 The x86 decoder uses mode metadata from the matching symbol file when available;
 otherwise it uses the selected CPU mode. Raw binaries do not record mode changes.
 

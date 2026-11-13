@@ -136,11 +136,21 @@ int main() {
     }
     for (const std::string& address : {"ebx + ecx * 4", "ebx sum ecx mul 4"}) {
         source.text = "mov eax, [" + address + "]";
-        if (parser.parse(source, statements, error) ||
-            error.find("Complex memory addresses are not yet supported") == std::string::npos) {
-            std::cerr << "Complex address was not rejected as expected: " << error << '\n';
+        if (!parser.parse(source, statements, error) || statements.size() != 1) {
+            std::cerr << "Scaled address parsing failed: " << error << '\n';
             return 1;
         }
+        const auto* scaled = dynamic_cast<const KasmStatement*>(statements[0].get());
+        if (!scaled || scaled->moveKind != MoveKind::MemoryToRegister || scaled->reg != "eax" ||
+            scaled->baseRegister != "ebx" || scaled->indexRegister != "ecx" || scaled->addressScale != 4) {
+            std::cerr << "Scaled address fields were incorrect\n";
+            return 1;
+        }
+    }
+    source.text = "mov eax, [ebx + ecx * 3]";
+    if (parser.parse(source, statements, error)) {
+        std::cerr << "Invalid scale accepted\n";
+        return 1;
     }
     return 0;
 }

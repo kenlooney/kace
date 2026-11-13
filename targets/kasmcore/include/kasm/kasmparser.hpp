@@ -361,9 +361,46 @@ public:
                     }
                     if (tokens.size() != 6)
                     {
-                        error = source.name + ":" + std::to_string(line_number) +
-                                ": Complex memory addresses are not yet supported";
-                        return false;
+                        const Node &root =
+                            statement.addressExpression.nodes[statement.addressExpression.root];
+
+                        if (root.kind != "+")
+                        {
+                            error = source.name + ":" + std::to_string(line_number) +
+                                    ": Expected a base plus a scaled index";
+                            return false;
+                        }
+                        const Node &base =
+                            statement.addressExpression.nodes[root.left];
+                        const Node &scaledIndex =
+                            statement.addressExpression.nodes[root.right];
+
+                        if (base.kind != "identifier" || scaledIndex.kind != "*")
+                        {
+                            error = source.name + ":" + std::to_string(line_number) +
+                                    ": Expected a base register plus a scaled index";
+                            return false;
+                        }
+                        const Node &index =
+                            statement.addressExpression.nodes[scaledIndex.left];
+                        const Node &scale =
+                            statement.addressExpression.nodes[scaledIndex.right];
+
+                        if (index.kind != "identifier" || scale.kind != "number" ||
+                            (scale.value != 1 && scale.value != 2 &&
+                             scale.value != 4 && scale.value != 8))
+                        {
+                            error = source.name + ":" + std::to_string(line_number) +
+                                    ": Expected an index register multiplied by 1, 2, 4, or 8";
+                            return false;
+                        }
+                        statement.moveKind = MoveKind::MemoryToRegister;
+                        statement.reg = tokens[1].text;
+                        statement.baseRegister = base.text;
+                        statement.indexRegister = index.text;
+                        statement.addressScale = static_cast<unsigned>(scale.value);
+                        statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
+                        continue;
                     }
                 }
                 // move/copy/mov ax, [bx]
