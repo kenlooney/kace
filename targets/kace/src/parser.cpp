@@ -51,7 +51,7 @@ bool Parser::number(std::size_t &node, std::string &error)
             {
                 continue;
             }
-
+            const std::size_t groupBegin = tokens[pos].span.begin;
             ++pos;
             if (!sum(node, error))
             {
@@ -64,6 +64,7 @@ bool Parser::number(std::size_t &node, std::string &error)
                 {
                     if (tokens[pos].text == close)
                     {
+                        tree->nodes[node].span = {groupBegin, tokens[pos].span.end};
                         ++pos;
                         return true;
                     }
@@ -92,14 +93,14 @@ bool Parser::number(std::size_t &node, std::string &error)
     if (pos < tokens.size() && matches_keyword("$"))
     {
         node = tree->nodes.size();
-        tree->nodes.push_back(Node{"current_position", 0, node, node});
+        tree->nodes.push_back(Node{"current_position", 0, node, node, tokens[pos].span});
         ++pos;
         return true;
     }
     if (pos < tokens.size() && matches_keyword("$$"))
     {
         node = tree->nodes.size();
-        tree->nodes.push_back(Node{"section_start", 0, node, node});
+        tree->nodes.push_back(Node{"section_start", 0, node, node, tokens[pos].span});
         ++pos;
         return true;
     }
@@ -117,7 +118,7 @@ bool Parser::number(std::size_t &node, std::string &error)
     }
 
     node = tree->nodes.size();
-    tree->nodes.push_back(Node{"number", value, node, node});
+    tree->nodes.push_back(Node{"number", value, node, node, tokens[pos].span});
     ++pos;
     return true;
 }
@@ -177,7 +178,11 @@ bool Parser::sum(std::size_t &node, std::string &error)
 
         const std::size_t left = node;
         node = tree->nodes.size();
-        tree->nodes.push_back(Node{operation, 0, left, right});
+        Span span{
+            tree->nodes[left].span.begin,
+            tree->nodes[right].span.end};
+
+        tree->nodes.push_back(Node{operation, 0, left, right, span});
     }
 
     return true;
@@ -251,13 +256,18 @@ bool Parser::product(std::size_t &node, std::string &error)
 
         const std::size_t left = node;
         node = tree->nodes.size();
-        tree->nodes.push_back(Node{operation, 0, left, right});
+        Span span{
+            tree->nodes[left].span.begin,
+            tree->nodes[right].span.end};
+
+        tree->nodes.push_back(Node{operation, 0, left, right, span});
+        
     }
 
     return true;
 }
 
-bool Parser::run(std::uint64_t &value, std::string &error)
+bool Parser::run(std::uint64_t &value, std::string &error, Span* errorSpan)
 {
     tree->nodes.clear();
     tree->root = 0;
@@ -273,14 +283,16 @@ bool Parser::run(std::uint64_t &value, std::string &error)
         return false;
     }
 
-    return evaluate(*tree, tree->root, value, error);
+    return evaluate(*tree, tree->root, value, error, nullptr, errorSpan);
 }
 
 bool Parser::evaluate(
     const Expression &expression,
     std::size_t node,
     std::uint64_t &value,
-    std::string &error, const PositionContext *positions)
+    std::string &error, 
+    const PositionContext *positions,
+    Span* errorSpan)
 {
     if (node >= expression.nodes.size())
     {
@@ -310,8 +322,8 @@ bool Parser::evaluate(
 
     std::uint64_t left = 0;
     std::uint64_t right = 0;
-    if (!evaluate(expression, current.left, left, error, positions) ||
-        !evaluate(expression, current.right, right, error, positions))
+    if (!evaluate(expression, current.left, left, error, positions, errorSpan) ||
+        !evaluate(expression, current.right, right, error, positions, errorSpan))
     {
         return false;
     }
@@ -349,6 +361,7 @@ bool Parser::evaluate(
         if (right == 0)
         {
             error = "Division by zero";
+            if (errorSpan) *errorSpan = expression.nodes[current.right].span;
             return false;
         }
         value = left / right;
@@ -358,6 +371,7 @@ bool Parser::evaluate(
         if (right == 0)
         {
             error = "Modulo by zero";
+            if (errorSpan) *errorSpan = expression.nodes[current.right].span;
             return false;
         }
         value = left % right;
@@ -407,14 +421,15 @@ bool Parser::parse_expression_tree(Expression &expression, std::string &error)
 bool Parser::parse_expression(
     Expression &expression,
     std::uint64_t &value,
-    std::string &error)
+    std::string &error,
+    Span* errorSpan)
 {
     if (tree != &expression)
     {
         expression = *tree;
         tree = &expression;
     }
-    return run(value, error);
+    return run(value, error, errorSpan);
 }
 
 bool Parser::parse_expression(
@@ -428,8 +443,10 @@ bool parse_expression(
     const std::vector<Token> &tokens,
     Expression &expression,
     std::uint64_t &value,
-    std::string &error)
+    std::string &error,
+    Span* errorSpan = nullptr)
 {
+    
     Parser parser(tokens, expression);
-    return parser.run(value, error);
+    return parser.run(value, error, errorSpan);
 }
