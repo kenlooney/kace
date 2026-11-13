@@ -65,6 +65,7 @@ public:
         keywords_table.addto_alias("jc", "ifcarry");
         keywords_table.addto_alias("jnc", "ifnotcarry");
         keywords_table.addto_alias("int", "interrupt");
+        keywords_table.addto_alias("hlt", "halt");
     }
 
     bool parse(
@@ -326,6 +327,18 @@ public:
                 }
                 statement.add_kind("Interrupt");
                 statement.interruptNumber = tokens[1].text;
+                statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
+                continue;
+            }
+            if (statement.name() == "hlt")
+            {
+                if (tokens.size() != 1)
+                {
+                    error = source.name + ":" + std::to_string(line_number) +
+                            ": Unexpected tokens after halt instruction";
+                    return false;
+                }
+                statement.add_kind("Halt");
                 statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }

@@ -42,7 +42,8 @@ assembly concepts.
 - Source-file inclusion with nested includes and cycle detection
 - Assembly-time output-position assertions with `#assertposition`
 - CPU plugins with assembler and optional disassembler contracts,
-  and an x86 plugin that encodes `nop`, short jumps, mode-aware near jumps, and 16-bit far jumps
+  and an x86 plugin that encodes `nop`, software interrupts, `hlt`, short jumps,
+  mode-aware near jumps, and 16-bit far jumps
 - Architecture-neutral register files and x86 register families with named,
   overlapping views and encoding IDs
 - An inheritable statement interface and named statement kinds, with KASM's
@@ -81,6 +82,21 @@ From a Windows Debug build, assemble it with:
 The output is the raw byte sequence `90 05 07 90`. The CPU defaults to
 `x86`; use `-c` or `--cpu` to select a plugin. Run `kasm --help` for CLI
 options. The plugin and shared libraries must be next to the executable.
+
+### Software interrupts and halt
+
+KASM assembles and disassembles the x86 software interrupt and halt instructions:
+
+```asm
+int 0x21       ; also spelled interrupt 0x21
+halt           ; also spelled hlt
+```
+
+These instructions emit `CD 21 F4`. The interrupt vector must be an integer
+literal from 0 through 255; its meaning depends on the execution environment.
+Disassembly uses the canonical names `int` and `hlt`, and displays the vector
+in decimal. The `hlt` instruction requires appropriate CPU privileges at
+runtime and emits no operand.
 
 ### Expression diagnostics
 
@@ -366,7 +382,7 @@ examples above describe the plugin API and decoder, not CLI assembly. Memory
 operands, extended registers (`r8`–`r15`), and additional operand-size and REX
 prefix forms remain future work for register moves.
 
-The x86 plugin can decode `nop`, supported register-immediate and register-to-register moves, short
+The x86 plugin can decode `nop`, `int`, `hlt`, supported register-immediate and register-to-register moves, short
 unconditional and conditional jumps, mode-aware near jumps, and 16-bit far jumps.
 To disassemble an existing binary into a text
 file, run:
