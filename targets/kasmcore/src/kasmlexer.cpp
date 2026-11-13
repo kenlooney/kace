@@ -215,6 +215,7 @@ std::vector<Token> KasmLexer::tokenize(const std::string& input) {
             continue;
         }
 
+       begin = cursor;
        ++cursor;
         addToken(Token{"punctuation", input.substr(cursor - 1, 1), Span{begin, cursor}});
     }

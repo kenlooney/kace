@@ -75,7 +75,7 @@ public:
         std::istringstream input(source.text);
         std::string line;
         std::size_t line_number = 0;
-       
+
         while (std::getline(input, line))
         {
             ++line_number;
@@ -91,7 +91,6 @@ public:
             statement.line = line_number;
             statement.sourceName = source.name;
             statement.column = tokens[0].span.begin + 1;
-            
 
             // Check for code segment keywords like "code16", "code32", "code64" before identifiers
             if (tokens[0].kind == "identifier" &&
@@ -287,14 +286,14 @@ public:
             if (statement.name() == "jz" || statement.name() == "jnz" ||
                 statement.name() == "jc" || statement.name() == "jnc")
             {
-                
-                if(tokens.size() == 1 || tokens.size() > 2)
+
+                if (tokens.size() == 1 || tokens.size() > 2)
                 {
                     error = source.name + ":" + std::to_string(line_number) +
                             ": Unexpected tokens for the conditional jump";
                     return false;
-                }  
-                if(tokens[1].text.empty())
+                }
+                if (tokens[1].text.empty())
                 {
                     error = source.name + ":" + std::to_string(line_number) +
                             ": Expected a target label for the conditional jump";
@@ -306,7 +305,7 @@ public:
                             ": Expected a target label for the conditional jump";
                     return false;
                 }
-                
+
                 statement.target = tokens[1].text;
                 statement.add_kind("ConditionalJump");
                 statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
@@ -439,14 +438,24 @@ public:
                 statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;
             }
+            Span errorSpan{};
             KasmParser line_parser(operands);
             if (!line_parser.parse_expression(
                     statement.expression,
                     statement.value,
-                    error))
+                    error,
+                    &errorSpan))
             {
+                bool hasErrorSpan = errorSpan.end > errorSpan.begin;
                 error = source.name + ":" +
                         std::to_string(line_number) + ": " + error;
+
+                if (hasErrorSpan)
+                {
+                    error += "\n" + line + "\n";
+                    error += std::string(errorSpan.begin, ' ') + "^";
+                }
+
                 return false;
             }
 

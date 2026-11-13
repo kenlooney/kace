@@ -17,10 +17,17 @@
 #include "kasm/diagnostic.hpp"
 #include <iostream>
 
-void KasmDiagnostic::report() const {
-    if(getFile() && getLine() >= 0 && getColumn() >= 0)
+void KasmDiagnostic::report() const
+{
+    if (getFile() && getLine() >= 0 && getColumn() >= 0)
         std::cerr << "Error: " << getMessage() << " at " << getFile() << ":" << getLine() << ":" << getColumn() << std::endl;
-    else if(!getFile())
+    else if (!getFile())
         std::cerr << "Error: " << getMessage() << ":" << getLine() << ":" << getColumn() << std::endl;
-   
+
+    if (!getSourceLine().empty())
+    {
+        std::cerr << getSourceLine() << '\n';
+          std::cerr << std::string(getSpan().begin, ' ') << "^\n";
+    }
+  
 }

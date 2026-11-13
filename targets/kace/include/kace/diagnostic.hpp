@@ -26,14 +26,18 @@ public:
     int getColumn() const { return column; }
     const char* getFile() const { return file.c_str(); }
     void setMessage(const char* newMessage) { message = newMessage; }
-    
-
+    void setSpan(const Span& newSpan) { span = newSpan; }
+    Span getSpan() const { return span; }
     virtual void report() const = 0;
+    void setSourceLine(const std::string& newSourceLine) { sourceLine = newSourceLine; }
+    std::string getSourceLine() const { return sourceLine; }
 
 private:
     const char* message;
     int line;
     int column;
     std::string file;
+    Span span{};
+    std::string sourceLine;
     
 };

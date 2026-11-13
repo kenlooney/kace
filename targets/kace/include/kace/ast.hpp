@@ -19,12 +19,14 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "span.hpp"
 
 struct Node {
     std::string kind;
     std::uint64_t value;
     std::size_t left;
     std::size_t right;
+    Span span;
 };
 
 struct Expression {
