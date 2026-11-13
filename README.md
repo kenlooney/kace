@@ -116,8 +116,8 @@ The first form supports `[bx]`, `[si]`, and `[di]`. The 32- and 64-bit
 forms support the first eight register groups as destinations and simple
 bases other than `[esp]`/`[rsp]` and `[ebp]`/`[rbp]`. Indexed addresses,
 displacements, extended registers, and memory stores are not yet supported.
-The x86 decoder handles these forms using its selected CPU mode; binaries do
-not record source-level mode changes for disassembly.
+The x86 decoder uses mode metadata from the matching symbol file when available;
+otherwise it uses the selected CPU mode. Raw binaries do not record mode changes.
 
 ### Expression diagnostics
 
@@ -281,8 +281,10 @@ end. Through the x86 plugin's C++ API, 32- and 64-bit modes use a five-byte
 `E9` form with a signed 32-bit displacement. Near-jump label fixups use the
 mode selected for each jump. Source statements `code16`, `code32`, and
 `code64` change the mode used for subsequent near-jump assembly. These
-statements do not emit bytes. Disassembly uses the plugin's selected mode;
-the binary does not record source mode changes.
+statements do not emit bytes. The symbol file records the x86 mode for emitted
+byte ranges. Disassembly uses that metadata and emits mode changes where needed;
+without it, the plugin's selected mode is used. Raw binaries do not record mode
+changes.
 
 KASM also assembles far jumps such as `jmp far 0x1234:0x5678`, with integer
 literals for the segment and offset. The `jump` and `goto` aliases work here

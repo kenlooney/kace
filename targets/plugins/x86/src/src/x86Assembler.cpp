@@ -57,8 +57,11 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             const std::size_t length = output.size() - offset;
             if (length != 0)
             {
-                labels.addByteRange({offset, length,
-                                     statement.sourceName, statement.line, statement.column});
+                std::uint8_t mode = current_mode == X86Mode::Bits16 ? 16 :
+                                    current_mode == X86Mode::Bits32 ? 32 : 64;
+                SymbolByteRange range{offset, length, statement.sourceName, statement.line, statement.column};
+                range.metadata.tags.push_back({"x86.mode", {mode}});
+                labels.addByteRange(range);
             }
         };
 

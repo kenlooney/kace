@@ -22,7 +22,7 @@ if(NOT result EQUAL 0)
 endif()
 file(READ "${symbols}" symbol_data)
 set(annotated "start:\n; source: ${source}:2:1\njmp short done\n; source: ${source}:3:1\nnop\ndone:\n; source: ${source}:5:1\njmp near start\n")
-if(NOT symbol_data MATCHES "KACE-SYM 2" OR
+if(NOT symbol_data MATCHES "KACE-SYM 3" OR
    NOT symbol_data MATCHES "symbol \"start\" 0 0 " OR
    NOT symbol_data MATCHES "symbol \"done\" 0 3 " OR
    NOT symbol_data MATCHES "bytes 0 2 .* 2 1" OR
@@ -102,3 +102,30 @@ endif()
 message(STATUS "Disassembly naming, decoding, and error handling passed")
 file(REMOVE "${source}" "${input}" "${symbols}" "${default_output}" "${custom_output}"
   "${TEST_DIR}/disassembly_roundtrip.bin" "${TEST_DIR}/disassembly_roundtrip.sym")
+
+# Mode metadata lets disassembly follow source mode changes and emit them again.
+file(WRITE "${source}" "code16\nmov ax, [bx]\ncode32\nmov eax, [ebx]\ncode64\nmov rax, [rbx]\n")
+execute_process(COMMAND "${KASM}" -i "${source}" -o "${input}" RESULT_VARIABLE result ERROR_VARIABLE error)
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "Mixed-mode assembly failed: ${error}")
+endif()
+execute_process(COMMAND "${KASM}" -d -i "${input}" RESULT_VARIABLE result ERROR_VARIABLE error)
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "Mixed-mode disassembly failed: ${error}")
+endif()
+file(READ "${default_output}" mixed)
+foreach(expected IN ITEMS "mov ax, [bx]" "code32" "mov eax, [ebx]" "code64" "mov rax, [rbx]")
+  string(FIND "${mixed}" "${expected}" found)
+  if(found EQUAL -1)
+    message(FATAL_ERROR "Missing ${expected} in mixed-mode disassembly: ${mixed}")
+  endif()
+endforeach()
+execute_process(COMMAND "${KASM}" -i "${default_output}" -o "${TEST_DIR}/disassembly_roundtrip.bin" RESULT_VARIABLE result ERROR_VARIABLE error)
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "Mixed-mode reassembly failed: ${error}")
+endif()
+file(READ "${input}" original HEX)
+file(READ "${TEST_DIR}/disassembly_roundtrip.bin" roundtrip HEX)
+if(NOT original STREQUAL roundtrip)
+  message(FATAL_ERROR "Mixed-mode round trip differs: ${original} vs ${roundtrip}")
+endif()

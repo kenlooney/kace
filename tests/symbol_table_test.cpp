@@ -27,7 +27,12 @@ int main() {
         std::cerr << "Label insertion, lookup, or duplicate detection failed\n";
         return 1;
     }
-    table.addByteRange({0, 2, sourceName, 4, 2});
+    Symbol tagged = *table.getSymbol("start");
+    tagged.metadata.tags.push_back({"test.tag", {0, 16, 255}});
+    table.addSymbol(tagged);
+    SymbolByteRange taggedRange{0, 2, sourceName, 4, 2};
+    taggedRange.metadata.tags.push_back({"x86.mode", {16}});
+    table.addByteRange(taggedRange);
     table.addByteRange({2, 1, "included.asm", 8, 1});
 
     const std::string filename = "symbol_table_test_symbols.txt";
@@ -47,9 +52,22 @@ int main() {
         ranges.size() != 2 || ranges[0].offset != 0 || ranges[0].length != 2 ||
         ranges[0].sourceName != sourceName || ranges[0].line != 4 || ranges[0].column != 2 ||
         ranges[1].offset != 2 || ranges[1].length != 1 || ranges[1].sourceName != "included.asm" ||
-        ranges[1].line != 8 || ranges[1].column != 1) {
+        ranges[1].line != 8 || ranges[1].column != 1 ||
+        start->metadata.tags.size() != 1 || start->metadata.tags[0].name != "test.tag" ||
+        start->metadata.tags[0].value != std::vector<std::uint8_t>({0, 16, 255}) ||
+        ranges[0].metadata.tags.size() != 1 || ranges[0].metadata.tags[0].name != "x86.mode" ||
+        ranges[0].metadata.tags[0].value != std::vector<std::uint8_t>({16})) {
         std::cerr << "Symbol source locations or byte ranges did not survive save and load\n";
         std::remove(filename.c_str());
+        return 1;
+    }
+    {
+        std::ofstream v2(filename);
+        v2 << "KACE-SYM 2\nsymbol \"old\" 0 0 \"old.asm\" 1 1\nbytes 0 1 \"old.asm\" 1 1\n";
+    }
+    if (!loaded.load_from_file(filename) || !loaded.getSymbol("old") ||
+        loaded.getByteRanges().size() != 1 || !loaded.getByteRanges()[0].metadata.tags.empty()) {
+        std::cerr << "Version 2 symbol file did not load correctly\n";
         return 1;
     }
     {
