@@ -7,7 +7,7 @@ function release(id, tag, prerelease, extra = {}) {
     published_at: `2026-11-${String(id).padStart(2, '0')}T00:00:00Z`, ...extra };
 }
 
-test('keeps five snapshots and three stable releases by publication time', () => {
+test('keeps four snapshots and four stable releases by publication time', () => {
   const snapshots = Array.from({ length: 7 }, (_, i) =>
     release(i + 1, `kace-dev-0.${i}.0-11092026`, true));
   const stable = Array.from({ length: 5 }, (_, i) =>
@@ -19,8 +19,8 @@ test('keeps five snapshots and three stable releases by publication time', () =>
     release(23, 'kace-0.10.0-11092026', false, { draft: true }),
   ];
   assert.deepEqual(releasesToPrune([...stable, ...unmanaged, ...snapshots]).map(r => r.tag_name), [
-    'kace-dev-0.1.0-11092026', 'kace-dev-0.0.0-11092026',
-    'kace-0.1.0-11092026', 'kace-0.0.0-11092026',
+    'kace-dev-0.2.0-11092026', 'kace-dev-0.1.0-11092026', 'kace-dev-0.0.0-11092026',
+    'kace-0.0.0-11092026',
   ]);
 });
 
@@ -35,14 +35,14 @@ test('keeps all releases when there are fewer than the limits', () => {
 });
 
 test('uses release id as a deterministic tie breaker', () => {
-  const releases = Array.from({ length: 4 }, (_, i) =>
+  const releases = Array.from({ length: 5 }, (_, i) =>
     release(i + 1, `kace-0.${i}.0-11092026`, false,
       { published_at: '2026-11-09T00:00:00Z' }));
   assert.deepEqual(releasesToPrune(releases).map(r => r.id), [1]);
 });
 
 test('requests all pages and deletes only the old managed release and tag', () => {
-  const releases = Array.from({ length: 4 }, (_, i) =>
+  const releases = Array.from({ length: 5 }, (_, i) =>
     release(i + 1, `kace-0.${i}.0-11092026`, false));
   const calls = [];
   runRetention('owner/repo', args => {
