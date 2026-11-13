@@ -40,6 +40,10 @@ public:
     const std::vector<std::uint8_t> &bytes,
     std::size_t &offset,
     std::string &text) const;
+    bool decode_scaled_memory_load(
+        const std::vector<std::uint8_t> &bytes,
+        std::size_t &offset,
+        std::string &text) const;
     
     bool near_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
                                 std::int64_t &displacement) const;

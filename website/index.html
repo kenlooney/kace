@@ -147,10 +147,17 @@ mov eax, [ebx]   ; 8B 03
 code64
 mov rax, [rbx]   ; 48 8B 03</code></pre>
           <p>In 16-bit mode, the supported bases are <code>bx</code>, <code>si</code>, and <code>di</code>.
-            The 32- and 64-bit forms support simple bases except <code>esp</code>/<code>rsp</code> and
-            <code>ebp</code>/<code>rbp</code>. Indexed addresses, displacements, extended registers,
-            and memory stores are still ahead. Disassembly uses the selected CPU mode; the binary does
-            not record source-level mode changes.</p>
+            The 32- and 64-bit forms also support stack-pointer bases. They can use a base plus a scaled index:</p>
+          <pre class="directive-example"><code>code32
+mov eax, [ebx + ecx * 4]        ; 8B 04 8B
+move eax, [ebx sum (ecx mul 4)] ; same bytes
+code64
+mov rax, [rbx + rcx * 4]        ; 48 8B 04 8B</code></pre>
+          <p>Scales can be 1, 2, 4, or 8. Parentheses around the scaled index work; expressions such as
+            <code>[(ebx + ecx) * 4]</code> are not supported yet. The index cannot be <code>esp</code> or
+            <code>rsp</code>, and <code>ebp</code>/<code>rbp</code> cannot be a base in these forms.
+            Displacements, extended registers, and memory stores are still ahead. A matching symbol file lets disassembly follow recorded
+            mode changes; without mode metadata it uses the selected CPU mode.</p>
           <p>Request a software interrupt with <code>int</code> (or <code>interrupt</code>) and use
             <code>hlt</code> (or <code>halt</code>) for the x86 halt instruction:</p>
           <pre class="directive-example"><code>int 0x21  ; CD 21
@@ -243,7 +250,7 @@ byte 3</code></pre>
                 <div><strong>x86</strong><span>DEFAULT CPU</span></div>
                 <p>The assembler supports <code>nop</code>, <code>int</code>, <code>hlt</code>, memory loads, short unconditional and conditional jumps, mode-aware near jumps, and 16-bit far jumps. The CLI can disassemble
                   supported immediate moves, register-to-register moves, memory loads, and those jump forms. Conditional jumps disassemble with numeric displacements.</p>
-                <p>Source statements <code>code16</code>, <code>code32</code>, and <code>code64</code> select the mode for subsequent near-jump assembly. Near jumps use a 16-bit displacement in 16-bit mode and a 32-bit displacement in 32- and 64-bit modes. The binary does not record mode changes for disassembly.</p>
+                <p>Source statements <code>code16</code>, <code>code32</code>, and <code>code64</code> select the mode for subsequent assembly. Near jumps use a 16-bit displacement in 16-bit mode and a 32-bit displacement in 32- and 64-bit modes. The symbol file records modes for disassembly; raw binaries do not.</p>
                 <p>The x86 register file groups overlapping names such as <code>rax</code>, <code>eax</code>, <code>ax</code>, <code>al</code>, and <code>ah</code>. The framework exposes register files while the plugin supplies x86-specific widths and encoding IDs.</p>
                 <p>The assembler supports immediate moves to <code>al</code>, <code>cl</code>, <code>dl</code>, <code>bl</code>, <code>ah</code>, <code>ch</code>, <code>dh</code>, and <code>bh</code>, and the first eight 16- and 32-bit register groups. For example, in 16-bit mode <code>mov cx, 0x1234</code> encodes as <code>B9 34 12</code>. The decoder supports those 8-bit moves and the first eight 16-, 32-, and 64-bit register groups; broader register and prefix support is still in progress.</p>
                 <p>The x86 plugin can encode and decode register-to-register moves for the first eight register groups. Its native-width examples are:</p>

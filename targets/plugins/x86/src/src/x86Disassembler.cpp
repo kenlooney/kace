@@ -25,6 +25,9 @@ bool X86Disassembler::disassemble(const std::vector<std::uint8_t> &bytes,
                                   std::string &error) const
 {
     const auto &byteRanges = symbols.getByteRanges();
+    const X86Mode initialMode = cpu_.getMode();
+    X86 decodeCpu;
+    decodeCpu.setMode(initialMode);
 
     std::map<std::size_t, std::vector<std::string>> labels;
     for (const Symbol &symbol : symbols.getSymbolsByKind(SymbolKind::Label))
@@ -36,19 +39,36 @@ bool X86Disassembler::disassemble(const std::vector<std::uint8_t> &bytes,
     {
         std::size_t start, end;
         std::string text;
+        X86Mode mode;
+        bool tagged;
     };
     std::vector<Instruction> instructions;
     std::size_t offset = 0;
     while (offset < bytes.size())
     {
         const auto start = offset;
+        bool tagged = false;
+        auto range = std::find_if(byteRanges.begin(), byteRanges.end(),
+                                  [&](const SymbolByteRange &entry) { return entry.offset == start; });
+        if (range != byteRanges.end()) {
+            for (const auto &tag : range->metadata.tags) {
+                if (tag.name != "x86.mode") continue;
+                if (tag.value.size() != 1 || (tag.value[0] != 16 && tag.value[0] != 32 && tag.value[0] != 64)) {
+                    error = "kasm: invalid x86 mode metadata at byte offset " + std::to_string(start);
+                    return false;
+                }
+                decodeCpu.setMode(tag.value[0] == 16 ? X86Mode::Bits16 : tag.value[0] == 32 ? X86Mode::Bits32 : X86Mode::Bits64);
+                tagged = true;
+                break;
+            }
+        }
         std::string decoded;
-        if (!cpu_.decoder()->decode(bytes, offset, decoded) || offset <= start || offset > bytes.size())
+        if (!decodeCpu.decoder()->decode(bytes, offset, decoded) || offset <= start || offset > bytes.size())
         {
             error = "kasm: could not decode instruction at byte offset " + std::to_string(start);
             return false;
         }
-        instructions.push_back({start, offset, std::move(decoded)});
+        instructions.push_back({start, offset, std::move(decoded), decodeCpu.getMode(), tagged});
     }
     for (const auto &label : labels)
     {
@@ -61,8 +81,15 @@ bool X86Disassembler::disassemble(const std::vector<std::uint8_t> &bytes,
         }
     }
     std::ostringstream output;
+    X86Mode outputMode = initialMode;
     for (const auto &instruction : instructions)
     {
+        decodeCpu.setMode(instruction.mode);
+        if (instruction.tagged && instruction.mode != outputMode) {
+            output << (instruction.mode == X86Mode::Bits16 ? "code16\n" :
+                       instruction.mode == X86Mode::Bits32 ? "code32\n" : "code64\n");
+            outputMode = instruction.mode;
+        }
         const auto range = std::find_if(byteRanges.begin(), byteRanges.end(),
                                         [&](const SymbolByteRange &entry)
                                         {
@@ -89,9 +116,9 @@ bool X86Disassembler::disassemble(const std::vector<std::uint8_t> &bytes,
         std::int64_t displacement = 0;
         std::string decoded = instruction.text;
         const char *jumpType = nullptr;
-        if (cpu_.decoder()->short_jump_displacement(bytes, instruction.start, displacement))
+        if (decodeCpu.decoder()->short_jump_displacement(bytes, instruction.start, displacement))
             jumpType = "short";
-        else if (cpu_.decoder()->near_jump_displacement(bytes, instruction.start, displacement))
+        else if (decodeCpu.decoder()->near_jump_displacement(bytes, instruction.start, displacement))
             jumpType = "near";
         if (jumpType)
         {

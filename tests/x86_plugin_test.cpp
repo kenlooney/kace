@@ -65,6 +65,72 @@ bool test_register_file() {
     return true;
 }
 
+bool test_scaled_memory_encoding() {
+    X86 cpu;
+    for (const auto mode : {X86Mode::Bits32, X86Mode::Bits64}) {
+        cpu.setMode(mode);
+        const bool is64 = mode == X86Mode::Bits64;
+        const char* dest = is64 ? "rax" : "eax";
+        const char* base = is64 ? "rbx" : "ebx";
+        const char* index = is64 ? "rcx" : "ecx";
+        for (const auto test : {std::pair<unsigned, std::uint8_t>{1, 0x0B},
+                                 {2, 0x4B}, {4, 0x8B}, {8, 0xCB}}) {
+            std::vector<std::vector<std::uint8_t>> bytes;
+            std::string error;
+            std::vector<std::vector<std::uint8_t>> expected;
+            if (is64) expected.push_back({0x48});
+            expected.push_back({0x8B});
+            expected.push_back({0x04});
+            expected.push_back({test.second});
+            if (!cpu.encoder()->encode_scaled_memory_load(dest, base, index, test.first, bytes, error) ||
+                bytes != expected) {
+                std::cerr << "Scaled memory encoding failed: " << error << '\n';
+                return false;
+            }
+            std::vector<std::uint8_t> input{0x90};
+            for (const auto& part : bytes) input.insert(input.end(), part.begin(), part.end());
+            std::size_t offset = 1;
+            std::string text;
+            if (!cpu.decoder()->decode(input, offset, text) || offset != input.size() ||
+                text != std::string("mov ") + dest + ", [" + base + " + " + index +
+                        " * " + std::to_string(test.first) + "]") {
+                std::cerr << "Scaled memory decoding failed: " << text << '\n';
+                return false;
+            }
+            for (std::size_t length = 1; length < input.size(); ++length) {
+                const std::vector<std::uint8_t> truncated(input.begin(), input.begin() + length);
+                offset = 1;
+                if (cpu.decoder()->decode(truncated, offset, text) || offset != 1) {
+                    std::cerr << "Truncated scaled memory load accepted\n";
+                    return false;
+                }
+            }
+        }
+        for (const auto* bad : {is64 ? "rsp" : "esp", is64 ? "r8" : "r8d", "unknown"}) {
+            std::vector<std::vector<std::uint8_t>> bytes{{0x90}};
+            std::string error;
+            if (cpu.encoder()->encode_scaled_memory_load(dest, base, bad, 4, bytes, error) ||
+                bytes != std::vector<std::vector<std::uint8_t>>{{0x90}} || error.empty()) return false;
+        }
+        for (unsigned scale : {0u, 3u, 16u}) {
+            std::vector<std::vector<std::uint8_t>> bytes{{0x90}};
+            std::string error;
+            if (cpu.encoder()->encode_scaled_memory_load(dest, base, index, scale, bytes, error) ||
+                bytes != std::vector<std::vector<std::uint8_t>>{{0x90}} || error.empty()) return false;
+        }
+        std::vector<std::vector<std::uint8_t>> bytes{{0x90}};
+        std::string error;
+        if (cpu.encoder()->encode_scaled_memory_load(dest, is64 ? "rbp" : "ebp", index, 4, bytes, error) ||
+            bytes != std::vector<std::vector<std::uint8_t>>{{0x90}} || error.empty()) return false;
+    }
+    cpu.setMode(X86Mode::Bits16);
+    std::vector<std::vector<std::uint8_t>> bytes{{0x90}};
+    std::string error;
+    if (cpu.encoder()->encode_scaled_memory_load("eax", "ebx", "ecx", 4, bytes, error) ||
+        bytes != std::vector<std::vector<std::uint8_t>>{{0x90}} || error.empty()) return false;
+    return true;
+}
+
 bool test_memory_load_encoding() {
     X86 cpu;
     struct Case {
@@ -78,8 +144,10 @@ bool test_memory_load_encoding() {
              {X86Mode::Bits16, "dx", "si", {0x8B, 0x14}},
              {X86Mode::Bits16, "di", "di", {0x8B, 0x3D}},
              {X86Mode::Bits32, "eax", "ebx", {0x8B, 0x03}},
+             {X86Mode::Bits32, "eax", "esp", {0x8B, 0x04, 0x24}},
              {X86Mode::Bits32, "edi", "esi", {0x8B, 0x3E}},
              {X86Mode::Bits64, "rax", "rbx", {0x48, 0x8B, 0x03}},
+             {X86Mode::Bits64, "rax", "rsp", {0x48, 0x8B, 0x04, 0x24}},
              {X86Mode::Bits64, "rdi", "rax", {0x48, 0x8B, 0x38}}}) {
         cpu.setMode(test.mode);
         std::vector<std::vector<std::uint8_t>> parts;
@@ -113,9 +181,7 @@ bool test_memory_load_encoding() {
     }
     for (const auto& test : {
              Case{X86Mode::Bits16, "ax", "bp", {}},
-             {X86Mode::Bits32, "eax", "esp", {}},
              {X86Mode::Bits32, "eax", "ebp", {}},
-             {X86Mode::Bits64, "rax", "rsp", {}},
              {X86Mode::Bits64, "rax", "rbp", {}},
              {X86Mode::Bits64, "r8", "rax", {}},
              {X86Mode::Bits32, "ax", "ebx", {}}}) {
@@ -129,6 +195,15 @@ bool test_memory_load_encoding() {
         }
     }
     cpu.setMode(X86Mode::Bits64);
+    {
+        const std::vector<std::uint8_t> invalidSib{0x48, 0x8B, 0x04, 0x20};
+        std::size_t offset = 0;
+        std::string text;
+        if (cpu.decoder()->decode(invalidSib, offset, text) || offset != 0) {
+            std::cerr << "Unsupported SIB was accepted\n";
+            return false;
+        }
+    }
     const std::vector<std::uint8_t> unprefixed{0x8B, 0x03};
     std::size_t offset = 0;
     std::string text;
@@ -480,6 +555,7 @@ bool test_near_modes() {
 }
 
 int main() {
+    if (!test_scaled_memory_encoding()) return 1;
     if (!test_memory_load_encoding()) return 1;
     if (!test_register_file()) return 1;
     if (!test_register_move_encoding()) return 1;

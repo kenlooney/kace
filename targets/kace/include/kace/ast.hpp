@@ -27,6 +27,8 @@ struct Node {
     std::size_t left;
     std::size_t right;
     Span span;
+    std::string text; // Name for an identifier node
+    
 };
 
 struct Expression {

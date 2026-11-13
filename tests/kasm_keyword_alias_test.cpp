@@ -120,5 +120,37 @@ int main() {
             return 1;
         }
     }
+    source.text = "mov ax, [bx]";
+    if (!parser.parse(source, statements, error) || statements.size() != 1) {
+        std::cerr << "Single-base memory load parsing failed: " << error << '\n';
+        return 1;
+    }
+    const auto* memory = dynamic_cast<const KasmStatement*>(statements[0].get());
+    if (!memory || memory->moveKind != MoveKind::MemoryToRegister ||
+        memory->reg != "ax" || memory->baseRegister != "bx" ||
+        memory->addressExpression.nodes.empty() ||
+        memory->addressExpression.nodes[memory->addressExpression.root].kind != "identifier" ||
+        memory->addressExpression.nodes[memory->addressExpression.root].text != "bx") {
+        std::cerr << "Single-base memory load or address tree was incorrect\n";
+        return 1;
+    }
+    for (const std::string& address : {"ebx + ecx * 4", "ebx sum ecx mul 4"}) {
+        source.text = "mov eax, [" + address + "]";
+        if (!parser.parse(source, statements, error) || statements.size() != 1) {
+            std::cerr << "Scaled address parsing failed: " << error << '\n';
+            return 1;
+        }
+        const auto* scaled = dynamic_cast<const KasmStatement*>(statements[0].get());
+        if (!scaled || scaled->moveKind != MoveKind::MemoryToRegister || scaled->reg != "eax" ||
+            scaled->baseRegister != "ebx" || scaled->indexRegister != "ecx" || scaled->addressScale != 4) {
+            std::cerr << "Scaled address fields were incorrect\n";
+            return 1;
+        }
+    }
+    source.text = "mov eax, [ebx + ecx * 3]";
+    if (parser.parse(source, statements, error)) {
+        std::cerr << "Invalid scale accepted\n";
+        return 1;
+    }
     return 0;
 }

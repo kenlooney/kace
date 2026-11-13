@@ -15,6 +15,7 @@
  */
 #pragma once
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -27,14 +28,21 @@ enum class SymbolKind {
     Directive
 };
 
+struct SymbolTag {
+    std::string name;
+    std::vector<std::uint8_t> value;
+};
+struct SymbolMetadata {
+    std::vector<SymbolTag> tags;
+};
 struct SymbolByteRange {
     std::size_t offset = 0;
     std::size_t length = 0;
     std::string sourceName;
     std::size_t line = 0;
     std::size_t column = 0;
+    SymbolMetadata metadata = {};
 };
-
 struct Symbol {
     std::string name;
     SymbolKind kind;
@@ -42,7 +50,7 @@ struct Symbol {
     std::string sourceName;
     std::size_t line = 0;
     std::size_t column = 0;
-
+    SymbolMetadata metadata = {};
 };
 
 class SymbolTable {
@@ -142,16 +150,20 @@ public:
         if (!file.is_open()) {
             return false;
         }
-        file << "KACE-SYM 2\n";
+        file << "KACE-SYM 3\n";
         for (const auto& pair : symbols) {
             const Symbol& symbol = pair.second;
             file << "symbol " << std::quoted(symbol.name) << " " << static_cast<int>(symbol.kind)
                  << " " << symbol.offset << " " << std::quoted(symbol.sourceName)
-                 << " " << symbol.line << " " << symbol.column << "\n";
+                 << " " << symbol.line << " " << symbol.column;
+            writeMetadata(file, symbol.metadata);
+            file << "\n";
         }
         for (const auto& range : byteRanges) {
             file << "bytes " << range.offset << " " << range.length << " "
-                 << std::quoted(range.sourceName) << " " << range.line << " " << range.column << "\n";
+                 << std::quoted(range.sourceName) << " " << range.line << " " << range.column;
+            writeMetadata(file, range.metadata);
+            file << "\n";
         }
         file.close();
         return static_cast<bool>(file);
@@ -165,7 +177,8 @@ public:
         std::string header;
         std::getline(file, header);
         if (!header.empty() && header.back() == '\r') header.pop_back();
-        if (header == "KACE-SYM 2") {
+        if (header == "KACE-SYM 2" || header == "KACE-SYM 3") {
+            const bool hasMetadata = header == "KACE-SYM 3";
             while (true) {
                 file >> std::ws;
                 if (file.eof()) break;
@@ -181,11 +194,13 @@ public:
                         kindInt > static_cast<int>(SymbolKind::Directive) ||
                         symbol.name.empty() || loaded.hasSymbol(symbol.name)) return false;
                     symbol.kind = static_cast<SymbolKind>(kindInt);
+                    if (hasMetadata && !readMetadata(file, symbol.metadata)) return false;
                     loaded.addSymbol(symbol);
                 } else if (record == "bytes") {
                     SymbolByteRange range;
                     if (!(file >> range.offset >> range.length >> std::quoted(range.sourceName) >>
                           range.line >> range.column)) return false;
+                    if (hasMetadata && !readMetadata(file, range.metadata)) return false;
                     loaded.addByteRange(range);
                 } else {
                     return false;
@@ -236,6 +251,40 @@ public:
 
 
 private:
+    static void writeMetadata(std::ostream& out, const SymbolMetadata& metadata) {
+        static const char hex[] = "0123456789abcdef";
+        out << " " << metadata.tags.size();
+        for (const auto& tag : metadata.tags) {
+            std::string value;
+            for (auto byte : tag.value) {
+                value += hex[byte >> 4];
+                value += hex[byte & 15];
+            }
+            out << " " << std::quoted(tag.name) << " " << std::quoted(value);
+        }
+    }
+    static bool readMetadata(std::istream& in, SymbolMetadata& metadata) {
+        std::size_t count;
+        if (!(in >> count)) return false;
+        for (std::size_t i = 0; i < count; ++i) {
+            SymbolTag tag;
+            std::string value;
+            if (!(in >> std::quoted(tag.name) >> std::quoted(value)) || value.size() % 2) return false;
+            auto digit = [](char c) -> int {
+                if (c >= '0' && c <= '9') return c - '0';
+                if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+                if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+                return -1;
+            };
+            for (std::size_t j = 0; j < value.size(); j += 2) {
+                int high = digit(value[j]), low = digit(value[j + 1]);
+                if (high < 0 || low < 0) return false;
+                tag.value.push_back(static_cast<std::uint8_t>((high << 4) | low));
+            }
+            metadata.tags.push_back(std::move(tag));
+        }
+        return true;
+    }
     std::unordered_map<std::string, Symbol> symbols;
     std::vector<SymbolByteRange> byteRanges;
 };

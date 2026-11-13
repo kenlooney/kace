@@ -59,7 +59,7 @@ bool X86Decoder::decode(
             return decode_register(bytes, offset, text);
         if (bytes[offset + 1] == 0x8B)
             return decode_memory_register(bytes, offset, text);
-        
+
         return decode_immediate(bytes, offset, text);
     }
     case 0xEB:
@@ -439,24 +439,23 @@ bool X86Decoder::decode_memory_register(
 {
     // Memory register decoding logic here
 
-   // Check for REX.W prefix in 64-bit mode
-   if(offset >= bytes.size())
-       return false;
+    // Check for REX.W prefix in 64-bit mode
+    if (offset >= bytes.size())
+        return false;
 
     std::size_t opcodeOffset = offset;
     bool hasRexW = false;
 
-
-    if(mode() == X86Mode::Bits64 && bytes[offset] == 0x48)
+    if (mode() == X86Mode::Bits64 && bytes[offset] == 0x48)
     {
         hasRexW = true;
         opcodeOffset = offset + 1;
     }
 
     // Check for MOV r64, r/m64 opcode (0x8B) after REX.W prefix if present
-    if(bytes.size() - opcodeOffset < 2 || bytes[opcodeOffset] != 0x8B)
+    if (bytes.size() - opcodeOffset < 2 || bytes[opcodeOffset] != 0x8B)
         return false;
-    
+
     // Extract ModR/M byte
     std::uint8_t modrm = bytes[opcodeOffset + 1];
 
@@ -468,77 +467,209 @@ bool X86Decoder::decode_memory_register(
     unsigned memoryCode = modrm & 0x7;
     // memoryCode: 3 bits specifying the memory operand (r/m)
 
-
-    
-    if(mod != 0)
+    if (mod != 0)
         return false; // Only support mod == 0 for now
 
+    bool hasSib = mode() != X86Mode::Bits16 && memoryCode == 4;
+    if (hasSib)
+    {
+        if (bytes.size() - opcodeOffset < 3)
+            return false;
+
+        if (bytes[opcodeOffset + 2] != 0x24)
+            return decode_scaled_memory_load(bytes, offset, text);
+    }
+
     const X86Register *destReg = cpu_.registers().getRegisterById(destId);
-    if(!destReg)
+    if (!destReg)
         return false; // Invalid destination register ID
 
     unsigned destWidth = 0;
 
-    switch(mode())
+    switch (mode())
     {
-        case X86Mode::Bits16:
-            destWidth = 16;
-            break;
-        case X86Mode::Bits32:
-            destWidth = 32;
-            break;
-        case X86Mode::Bits64:
-            destWidth = hasRexW ? 64 : 32;
-            break;
-        default:
-            return false; // Unsupported mode
+    case X86Mode::Bits16:
+        destWidth = 16;
+        break;
+    case X86Mode::Bits32:
+        destWidth = 32;
+        break;
+    case X86Mode::Bits64:
+        destWidth = hasRexW ? 64 : 32;
+        break;
+    default:
+        return false; // Unsupported mode
     }
 
     const std::string *destName = destReg->getAliasByWidth(destWidth);
-    if(!destName)
+    if (!destName)
         return false; // Failed to get destination register name
 
     std::string baseName;
 
-    if(mode() == X86Mode::Bits16)
+    if (mode() == X86Mode::Bits16)
     {
-        switch(memoryCode)
+        switch (memoryCode)
         {
-            case 4: baseName = "si"; break;
-            case 5: baseName = "di"; break;
-            case 7: baseName = "bx"; break;
-           
-            default: return false; // Invalid memory code
+        case 4:
+            baseName = "si";
+            break;
+        case 5:
+            baseName = "di";
+            break;
+        case 7:
+            baseName = "bx";
+            break;
+
+        default:
+            return false; // Invalid memory code
         }
     }
-    else if(mode() == X86Mode::Bits32)
+    else if (mode() == X86Mode::Bits32)
     {
-        switch(memoryCode)
+        switch (memoryCode)
         {
-            case 0: baseName = "eax"; break;
-            case 1: baseName = "ecx"; break;
-            case 2: baseName = "edx"; break;
-            case 3: baseName = "ebx"; break;
-            case 6: baseName = "esi"; break;
-            case 7: baseName = "edi"; break;
-            default: return false; // Invalid memory code
+        case 0:
+            baseName = "eax";
+            break;
+        case 1:
+            baseName = "ecx";
+            break;
+        case 2:
+            baseName = "edx";
+            break;
+        case 3:
+            baseName = "ebx";
+            break;
+        case 4:
+            baseName = "esp";
+            break;
+        case 6:
+            baseName = "esi";
+            break;
+        case 7:
+            baseName = "edi";
+            break;
+        default:
+            return false; // Invalid memory code
         }
     }
-    else if(mode() == X86Mode::Bits64)
+    else if (mode() == X86Mode::Bits64)
     {
-        switch(memoryCode)
+        switch (memoryCode)
         {
-            case 0: baseName = "rax"; break;
-            case 1: baseName = "rcx"; break;
-            case 2: baseName = "rdx"; break;
-            case 3: baseName = "rbx"; break;
-            case 6: baseName = "rsi"; break;
-            case 7: baseName = "rdi"; break;
-            default: return false; // Invalid memory code
+        case 0:
+            baseName = "rax";
+            break;
+        case 1:
+            baseName = "rcx";
+            break;
+        case 2:
+            baseName = "rdx";
+            break;
+        case 3:
+            baseName = "rbx";
+            break;
+        case 4:
+            baseName = "rsp";
+            break;
+        case 6:
+            baseName = "rsi";
+            break;
+        case 7:
+            baseName = "rdi";
+            break;
+        default:
+            return false; // Invalid memory code
         }
     }
 
     text = "mov " + *destName + ", [" + baseName + "]";
-    offset = opcodeOffset + 2; // Update offset to point after the decoded instruction
-    return true; // Successfully decoded instruction
+    offset = opcodeOffset + 2 + (hasSib ? 1 : 0); // Update offset to account for optional SIB byte
+    return true;                                  // Successfully decoded instruction
+}
+
+bool X86Decoder::decode_scaled_memory_load(
+    const std::vector<std::uint8_t> &bytes,
+    std::size_t &offset,
+    std::string &text) const
+{
+    if (offset >= bytes.size())
+        return false;
+
+    std::size_t opcodeOffset = offset;
+    bool hasRexW = false;
+
+    if (mode() == X86Mode::Bits64 && bytes[offset] == 0x48)
+    {
+        hasRexW = true;
+        opcodeOffset = offset + 1;
+    }
+
+    if (bytes.size() - opcodeOffset < 3 ||
+        bytes[opcodeOffset] != 0x8B)
+        return false;
+
+    // Extract ModR/M and SIB bytes for the scaled memory load instruction
+    std::uint8_t modrm = bytes[opcodeOffset + 1];
+    std::uint8_t sib = bytes[opcodeOffset + 2];
+
+    // Decode the ModR/M byte
+    unsigned mod = (modrm >> 6) & 0x03;
+    // Extract the destination register ID and memory code from the ModR/M byte
+    unsigned destId = (modrm >> 3) & 0x07;
+    // Extract the memory code from the ModR/M byte
+    unsigned memoryCode = modrm & 0x07;
+
+    // Validate the ModR/M and SIB bytes for a scaled memory load
+    if ((
+            mode() != X86Mode::Bits32 &&
+            mode() != X86Mode::Bits64) ||
+        mod != 0 ||
+        memoryCode != 4)
+        return false;
+
+    // Decode the SIB byte
+    unsigned scaleBits = (sib >> 6) & 0x03;
+    // Extract the scale factor from the SIB byte
+    unsigned indexId = (sib >> 3) & 0x07;
+    // Extract the index register ID from the SIB byte
+    unsigned baseId = sib & 0x07;
+
+    // Validate the index and base registers for the scaled memory load
+    if (indexId == 4 || baseId == 5)
+        return false; // Invalid index or base register for scaled memory load
+
+    // Retrieve the register objects for the destination, index, and base registers
+    const X86Register *destReg = cpu_.registers().getRegisterById(destId);
+    // Retrieve the register object for the index register
+    const X86Register *indexReg = cpu_.registers().getRegisterById(indexId);
+    // Retrieve the register object for the base register
+    const X86Register *baseReg = cpu_.registers().getRegisterById(baseId);
+
+    // Ensure that all required registers were successfully retrieved
+    if (!destReg || !indexReg || !baseReg)
+        return false;
+
+    // Determine the width of the destination and address registers based on the mode and REX prefix
+    unsigned destWidth = mode() == X86Mode::Bits64 && hasRexW ? 64 : 32;
+    unsigned addressWidth = mode() == X86Mode::Bits64 ? 64 : 32;
+
+    // Retrieve the register aliases for the destination, base, and index registers based on their widths
+    const std::string *destName = destReg->getAliasByWidth(destWidth);
+    const std::string *baseName = baseReg->getAliasByWidth(addressWidth);
+    const std::string *indexName = indexReg->getAliasByWidth(addressWidth);
+
+    // Ensure that the register aliases were successfully retrieved
+    if (!destName || !baseName || !indexName)
+        return false;
+
+    // Calculate the scale factor from the scale bits in the SIB byte
+    unsigned scale = 1u << scaleBits;
+
+    // Construct the disassembled instruction text for the scaled memory load
+    text = "mov " + *destName + ", [" + *baseName + " + " +
+           *indexName + " * " + std::to_string(scale) + "]";
+    offset = opcodeOffset + 3;
+    return true;
 }
