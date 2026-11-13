@@ -484,6 +484,91 @@ bool X86Encoder::encode_scaled_memory_load(
     return false;
 }
 
+bool X86Encoder::encode_displaced_memory_load(
+    const std::string &dest,
+    const std::string &base,
+    std::int64_t displacement,
+    std::vector<std::vector<std::uint8_t>> &bytes,
+    std::string &error) const
+{
+    if (displacement < INT32_MIN || displacement > INT32_MAX)
+    {
+        error = "Displacement must fit in 32 bits";
+        return false;
+    }
+    bool shortDisplacement = displacement >= -128 && displacement <= 127;
+
+    X86Register *destReg = cpu_.registers().getRegisterByName(dest);
+    X86Register *baseReg = cpu_.registers().getRegisterByName(base);
+
+    if (!destReg || !baseReg)
+    {
+        error = "Invalid destination or base register";
+        return false;
+    }
+    unsigned addressWidth = 0;
+
+    if (cpu_.getMode() == X86Mode::Bits32)
+        addressWidth = 32;
+    else if (cpu_.getMode() == X86Mode::Bits64)
+        addressWidth = 64;
+    else
+    {
+        error = "Displaced memory loads are not supported in this mode";
+        return false;
+    }
+
+    if (!baseReg->hasWidth(base, addressWidth))
+    {
+        error = "Base register has the wrong width for this mode";
+        return false;
+    }
+
+    bool destIs32 = destReg->hasWidth(dest, 32);
+    bool destIs64 = destReg->hasWidth(dest, 64);
+
+    if (!destIs32 && !(addressWidth == 64 && destIs64))
+    {
+        error = "Unsupported destination register width";
+        return false;
+    }
+
+    int destId = destReg->getGroupId();
+    int baseId = baseReg->getGroupId();
+
+    // Check that the destination and base register IDs are within the valid range (0-7)
+    if (destId < 0 || destId > 7 || baseId < 0 || baseId > 7)
+    {
+        error = "Unsupported destination or base register";
+        return false;
+    }
+
+    // Determine the Mod field for the ModR/M byte based on the displacement size
+    unsigned mod = shortDisplacement ? 1 : 2;
+
+    // Add REX prefix for 64-bit destination register if needed
+    if (destIs64)
+        bytes.push_back({0x48}); // REX.W
+
+    bytes.push_back({0x8B});
+    bytes.push_back({static_cast<std::uint8_t>(
+        (mod << 6) | (destId << 3) | baseId)});
+
+    // Add SIB byte if the base register is ESP (baseId == 4)
+    if (baseId == 4)
+        bytes.push_back({0x24});
+
+    std::uint64_t raw = static_cast<std::uint64_t>(displacement);
+    unsigned displacementBytes = shortDisplacement ? 1 : 4;
+
+    // Add displacement bytes
+    for (unsigned i = 0; i < displacementBytes; ++i)
+        bytes.push_back({static_cast<std::uint8_t>(raw >> (i * 8))});
+
+    error.clear();
+    return true;
+}
+
 bool X86Encoder::encode_near_jump(
     std::int64_t displacement, std::vector<std::uint8_t> &bytes,
     std::string &error) const

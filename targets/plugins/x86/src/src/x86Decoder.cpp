@@ -467,8 +467,11 @@ bool X86Decoder::decode_memory_register(
     unsigned memoryCode = modrm & 0x7;
     // memoryCode: 3 bits specifying the memory operand (r/m)
 
+    if (mod == 1 || mod == 2)
+        return decode_displaced_memory_load(bytes, offset, text);
+
     if (mod != 0)
-        return false; // Only support mod == 0 for now
+        return false;
 
     bool hasSib = mode() != X86Mode::Bits16 && memoryCode == 4;
     if (hasSib)
@@ -671,5 +674,92 @@ bool X86Decoder::decode_scaled_memory_load(
     text = "mov " + *destName + ", [" + *baseName + " + " +
            *indexName + " * " + std::to_string(scale) + "]";
     offset = opcodeOffset + 3;
+    return true;
+}
+
+bool X86Decoder::decode_displaced_memory_load(
+    const std::vector<std::uint8_t> &bytes,
+    std::size_t &offset,
+    std::string &text) const
+{
+
+    if (offset >= bytes.size())
+        return false;
+
+    std::size_t opcodeOffset = offset;
+    bool hasRexW = false;
+    // Check for REX.W prefix in 64-bit mode
+    if (mode() == X86Mode::Bits64 && bytes[offset] == 0x48)
+    {
+        hasRexW = true;
+        opcodeOffset = offset + 1;
+    }
+    // Ensure that there are enough bytes for the opcode and ModR/M byte
+    if (bytes.size() - opcodeOffset < 2 ||
+        bytes[opcodeOffset] != 0x8B)
+        return false;
+
+    // Extract the ModR/M byte following the opcode
+    std::uint8_t modrm = bytes[opcodeOffset + 1];
+
+    unsigned mod = (modrm >> 6) & 0x03;
+    unsigned destId = (modrm >> 3) & 0x07;
+    unsigned baseId = modrm & 0x07;
+
+    if ((mode() != X86Mode::Bits32 && mode() != X86Mode::Bits64) ||
+        (mod != 1 && mod != 2))
+        return false;
+
+    std::size_t displacementOffset = opcodeOffset + 2;
+
+    if (baseId == 4)
+    {
+        if (bytes.size() - displacementOffset < 1 ||
+            bytes[displacementOffset] != 0x24)
+            return false;
+
+        ++displacementOffset;
+    }
+    unsigned displacementBytes = mod == 1 ? 1 : 4;
+
+    if (bytes.size() - displacementOffset < displacementBytes)
+        return false;
+
+    std::uint32_t raw = 0;
+
+    for (unsigned i = 0; i < displacementBytes; ++i)
+        raw |= static_cast<std::uint32_t>(bytes[displacementOffset + i]) << (i * 8);
+
+    std::int64_t displacement;
+
+    if (displacementBytes == 1)
+        displacement = raw < 0x80 ? raw : static_cast<std::int64_t>(raw) - 0x100;
+    else
+        displacement = raw < 0x80000000u ? raw : static_cast<std::int64_t>(raw) - 0x100000000LL;
+
+    const X86Register *destReg = cpu_.registers().getRegisterById(destId);
+    const X86Register *baseReg = cpu_.registers().getRegisterById(baseId);
+
+    if (!destReg || !baseReg)
+        return false;
+
+    unsigned destWidth = mode() == X86Mode::Bits64 && hasRexW ? 64 : 32;
+    unsigned addressWidth = mode() == X86Mode::Bits64 ? 64 : 32;
+
+    const std::string *destName = destReg->getAliasByWidth(destWidth);
+    const std::string *baseName = baseReg->getAliasByWidth(addressWidth);
+
+    if (!destName || !baseName)
+        return false;
+
+    text = "mov " + *destName + ", [" + *baseName;
+
+    if (displacement < 0)
+        text += " - " + std::to_string(-displacement);
+    else
+        text += " + " + std::to_string(displacement);
+
+    text += "]";
+    offset = displacementOffset + displacementBytes;
     return true;
 }
