@@ -14,7 +14,7 @@ export function releasesToPrune(releases) {
     .sort((a, b) => b.published_at.localeCompare(a.published_at) || b.id - a.id)
     .slice(keep);
 
-  const old = [...candidates(snapshotTag, true, 5), ...candidates(stableTag, false, 3)];
+  const old = [...candidates(snapshotTag, true, 4), ...candidates(stableTag, false, 4)];
   const immutable = old.filter(release => release.immutable);
   if (immutable.length) {
     throw new Error(`Cannot prune immutable releases: ${immutable.map(release => release.tag_name).join(', ')}`);
