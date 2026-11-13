@@ -129,8 +129,26 @@ mov rax, [rbx + rcx * 4]       ; 48 8B 04 8B
 The supported expression shape is `base + index * scale`, with scale 1, 2, 4,
 or 8. Parentheses around the scaled index work, but `[(ebx + ecx) * 4]` is
 not currently supported. The index cannot be `esp`/`rsp`, and `ebp`/`rbp`
-cannot be the base in this form. Displacements, extended registers, other
-address expression shapes, and memory stores are not yet supported.
+cannot be the base in this form.
+
+Base-register loads can instead use a signed displacement in 32- and 64-bit
+modes:
+
+```asm
+code32
+mov eax, [ebx + 4]    ; 8B 43 04
+mov eax, [ebp + 0]    ; 8B 45 00
+code64
+mov eax, [rbx - 4]    ; 8B 43 FC
+mov rax, [rsp + 4]    ; 48 8B 44 24 04
+```
+
+The displacement must fit in a signed 32-bit integer; values from -128 through
+127 use one byte, and other values use four little-endian bytes. Use an explicit
+`+ 0` for `[ebp]` or `[rbp]`. In 64-bit mode, this form supports a 32-bit or
+64-bit destination with a 64-bit base. Combining a scaled index with a
+displacement, extended registers, other address expression shapes, and memory
+stores are not yet supported.
 The x86 decoder uses mode metadata from the matching symbol file when available;
 otherwise it uses the selected CPU mode. Raw binaries do not record mode changes.
 

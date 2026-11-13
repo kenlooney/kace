@@ -156,7 +156,18 @@ mov rax, [rbx + rcx * 4]        ; 48 8B 04 8B</code></pre>
           <p>Scales can be 1, 2, 4, or 8. Parentheses around the scaled index work; expressions such as
             <code>[(ebx + ecx) * 4]</code> are not supported yet. The index cannot be <code>esp</code> or
             <code>rsp</code>, and <code>ebp</code>/<code>rbp</code> cannot be a base in these forms.
-            Displacements, extended registers, and memory stores are still ahead. A matching symbol file lets disassembly follow recorded
+            Extended registers and memory stores are still ahead.</p>
+          <p>Base-register loads can also use a signed displacement in 32- and 64-bit modes:</p>
+          <pre class="directive-example"><code>code32
+mov eax, [ebx + 4] ; 8B 43 04
+mov eax, [ebp + 0] ; 8B 45 00
+code64
+mov eax, [rbx - 4] ; 8B 43 FC
+mov rax, [rsp + 4] ; 48 8B 44 24 04</code></pre>
+          <p>Displacements fit in a signed 32-bit integer, using one byte when the value is between -128
+            and 127, or four bytes otherwise. Use an explicit <code>+ 0</code> for an <code>ebp</code> or
+            <code>rbp</code> base. Combining a scaled index with a displacement is not yet supported.
+            A matching symbol file lets disassembly follow recorded
             mode changes; without mode metadata it uses the selected CPU mode.</p>
           <p>Request a software interrupt with <code>int</code> (or <code>interrupt</code>) and use
             <code>hlt</code> (or <code>halt</code>) for the x86 halt instruction:</p>

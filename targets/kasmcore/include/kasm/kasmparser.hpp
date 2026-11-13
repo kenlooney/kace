@@ -364,7 +364,7 @@ public:
                         const Node &root =
                             statement.addressExpression.nodes[statement.addressExpression.root];
 
-                        if (root.kind != "+")
+                        if (root.kind != "+" && root.kind != "-")
                         {
                             error = source.name + ":" + std::to_string(line_number) +
                                     ": Expected a base plus a scaled index";
@@ -375,7 +375,30 @@ public:
                         const Node &scaledIndex =
                             statement.addressExpression.nodes[root.right];
 
-                        if (base.kind != "identifier" || scaledIndex.kind != "*")
+                        if (base.kind == "identifier" && scaledIndex.kind == "number")
+                        {
+                            std::uint64_t maxMagnitude =
+                                root.kind == "-" ? 2147483648ULL : 2147483647ULL;
+
+                            if (scaledIndex.value > maxMagnitude)
+                            {
+                                error = source.name + ":" + std::to_string(line_number) +
+                                        ": Displacement must fit in signed 32 bits";
+                                return false;
+                            }
+                            statement.moveKind = MoveKind::MemoryToRegister;
+                            statement.reg = tokens[1].text;
+                            statement.baseRegister = base.text;
+                            statement.hasDisplacement = true;
+
+                            std::int64_t magnitude = static_cast<std::int64_t>(scaledIndex.value);
+                            statement.displacement = root.kind == "-" ? -magnitude : magnitude;
+
+                            statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
+                            continue;
+                        }
+
+                        if (root.kind != "+" || base.kind != "identifier" || scaledIndex.kind != "*")
                         {
                             error = source.name + ":" + std::to_string(line_number) +
                                     ": Expected a base register plus a scaled index";

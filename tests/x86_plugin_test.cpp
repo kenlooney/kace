@@ -65,6 +65,72 @@ bool test_register_file() {
     return true;
 }
 
+bool test_displaced_memory_encoding() {
+    X86 cpu;
+    struct Case {
+        X86Mode mode;
+        const char* dest;
+        const char* base;
+        std::int64_t displacement;
+        std::vector<std::vector<std::uint8_t>> expected;
+    };
+    for (const auto& test : {
+             Case{X86Mode::Bits32, "eax", "ebx", 127, {{0x8B}, {0x43}, {0x7F}}},
+             {X86Mode::Bits32, "eax", "ebx", -128, {{0x8B}, {0x43}, {0x80}}},
+             {X86Mode::Bits32, "eax", "ebx", 128, {{0x8B}, {0x83}, {0x80}, {0}, {0}, {0}}},
+             {X86Mode::Bits32, "eax", "ebx", -129, {{0x8B}, {0x83}, {0x7F}, {0xFF}, {0xFF}, {0xFF}}},
+             {X86Mode::Bits32, "eax", "esp", 4, {{0x8B}, {0x44}, {0x24}, {0x04}}},
+             {X86Mode::Bits32, "eax", "ebp", 0, {{0x8B}, {0x45}, {0}}},
+             {X86Mode::Bits64, "rax", "rbx", 4, {{0x48}, {0x8B}, {0x43}, {0x04}}},
+             {X86Mode::Bits64, "eax", "rbx", -4, {{0x8B}, {0x43}, {0xFC}}},
+             {X86Mode::Bits64, "rax", "rsp", 4, {{0x48}, {0x8B}, {0x44}, {0x24}, {0x04}}},
+             {X86Mode::Bits64, "rax", "rbp", 0, {{0x48}, {0x8B}, {0x45}, {0}}}}) {
+        cpu.setMode(test.mode);
+        std::vector<std::vector<std::uint8_t>> bytes;
+        std::string error;
+        if (!cpu.encoder()->encode_displaced_memory_load(test.dest, test.base, test.displacement, bytes, error) ||
+            bytes != test.expected) {
+            std::cerr << "Displaced memory encoding failed: " << error << '\n';
+            return false;
+        }
+        std::vector<std::uint8_t> input{0x90};
+        for (const auto& part : bytes) input.insert(input.end(), part.begin(), part.end());
+        std::size_t offset = 1;
+        std::string text;
+        const std::string expected = std::string("mov ") + test.dest + ", [" + test.base +
+            (test.displacement < 0 ? " - " : " + ") +
+            std::to_string(test.displacement < 0 ? -test.displacement : test.displacement) + "]";
+        if (!cpu.decoder()->decode(input, offset, text) || offset != input.size() || text != expected) {
+            std::cerr << "Displaced memory decoding failed: " << text << '\n';
+            return false;
+        }
+        for (std::size_t length = 1; length < input.size(); ++length) {
+            std::vector<std::uint8_t> truncated(input.begin(), input.begin() + length);
+            offset = 1;
+            if (cpu.decoder()->decode(truncated, offset, text) || offset != 1) {
+                std::cerr << "Truncated displaced memory load accepted\n";
+                return false;
+            }
+        }
+    }
+    for (const auto& test : {
+             Case{X86Mode::Bits32, "eax", "ebx", 2147483648LL, {}},
+             {X86Mode::Bits64, "rax", "rbx", -2147483649LL, {}},
+             {X86Mode::Bits64, "r8", "rbx", 1, {}},
+             {X86Mode::Bits32, "eax", "rbx", 1, {}},
+             {X86Mode::Bits16, "eax", "ebx", 1, {}}}) {
+        cpu.setMode(test.mode);
+        std::vector<std::vector<std::uint8_t>> bytes{{0x90}};
+        std::string error;
+        if (cpu.encoder()->encode_displaced_memory_load(test.dest, test.base, test.displacement, bytes, error) ||
+            bytes != std::vector<std::vector<std::uint8_t>>{{0x90}} || error.empty()) {
+            std::cerr << "Invalid displaced memory encoding accepted\n";
+            return false;
+        }
+    }
+    return true;
+}
+
 bool test_scaled_memory_encoding() {
     X86 cpu;
     for (const auto mode : {X86Mode::Bits32, X86Mode::Bits64}) {
@@ -555,6 +621,7 @@ bool test_near_modes() {
 }
 
 int main() {
+    if (!test_displaced_memory_encoding()) return 1;
     if (!test_scaled_memory_encoding()) return 1;
     if (!test_memory_load_encoding()) return 1;
     if (!test_register_file()) return 1;

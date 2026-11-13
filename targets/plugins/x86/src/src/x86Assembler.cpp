@@ -175,8 +175,13 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             std::vector<std::vector<std::uint8_t>> encoded;
 
             bool encodedOk;
-
-            if (statement.indexRegister.empty())
+            if (statement.hasDisplacement)
+            {
+                encodedOk = cpu_.encoder()->encode_displaced_memory_load(
+                    statement.reg, statement.baseRegister, statement.displacement,
+                    encoded, error);
+            }
+            else if (statement.indexRegister.empty())
             {
                 encodedOk = cpu_.encoder()->encode_memory_register(
                     statement.name(), statement.reg, statement.baseRegister, encoded, error);

@@ -51,9 +51,10 @@ public:
     std::string indexRegister;
     Expression addressExpression;
     unsigned addressScale = 1;
+    bool hasDisplacement = false;
+    std::int64_t displacement = 0;
     bool parse_statement(const std::vector<Token> &tokens, std::string &error) override
     {
         return false;
     }
-
 };
