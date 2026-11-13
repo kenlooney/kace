@@ -147,9 +147,16 @@ mov eax, [ebx]   ; 8B 03
 code64
 mov rax, [rbx]   ; 48 8B 03</code></pre>
           <p>In 16-bit mode, the supported bases are <code>bx</code>, <code>si</code>, and <code>di</code>.
-            The 32- and 64-bit forms support simple bases except <code>esp</code>/<code>rsp</code> and
-            <code>ebp</code>/<code>rbp</code>. Indexed addresses, displacements, extended registers,
-            and memory stores are still ahead. A matching symbol file lets disassembly follow recorded
+            The 32- and 64-bit forms also support stack-pointer bases. They can use a base plus a scaled index:</p>
+          <pre class="directive-example"><code>code32
+mov eax, [ebx + ecx * 4]        ; 8B 04 8B
+move eax, [ebx sum (ecx mul 4)] ; same bytes
+code64
+mov rax, [rbx + rcx * 4]        ; 48 8B 04 8B</code></pre>
+          <p>Scales can be 1, 2, 4, or 8. Parentheses around the scaled index work; expressions such as
+            <code>[(ebx + ecx) * 4]</code> are not supported yet. The index cannot be <code>esp</code> or
+            <code>rsp</code>, and <code>ebp</code>/<code>rbp</code> cannot be a base in these forms.
+            Displacements, extended registers, and memory stores are still ahead. A matching symbol file lets disassembly follow recorded
             mode changes; without mode metadata it uses the selected CPU mode.</p>
           <p>Request a software interrupt with <code>int</code> (or <code>interrupt</code>) and use
             <code>hlt</code> (or <code>halt</code>) for the x86 halt instruction:</p>

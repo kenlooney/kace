@@ -50,6 +50,7 @@ public:
     std::string baseRegister;
     std::string indexRegister;
     Expression addressExpression;
+    unsigned addressScale = 1;
     bool parse_statement(const std::vector<Token> &tokens, std::string &error) override
     {
         return false;

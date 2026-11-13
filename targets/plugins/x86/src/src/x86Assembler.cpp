@@ -57,8 +57,8 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             const std::size_t length = output.size() - offset;
             if (length != 0)
             {
-                std::uint8_t mode = current_mode == X86Mode::Bits16 ? 16 :
-                                    current_mode == X86Mode::Bits32 ? 32 : 64;
+                std::uint8_t mode = current_mode == X86Mode::Bits16 ? 16 : current_mode == X86Mode::Bits32 ? 32
+                                                                                                           : 64;
                 SymbolByteRange range{offset, length, statement.sourceName, statement.line, statement.column};
                 range.metadata.tags.push_back({"x86.mode", {mode}});
                 labels.addByteRange(range);
@@ -174,8 +174,21 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             cpu_.setMode(current_mode);
             std::vector<std::vector<std::uint8_t>> encoded;
 
-            if (!cpu_.encoder()->encode_memory_register(
-                    statement.name(), statement.reg, statement.baseRegister, encoded, error))
+            bool encodedOk;
+
+            if (statement.indexRegister.empty())
+            {
+                encodedOk = cpu_.encoder()->encode_memory_register(
+                    statement.name(), statement.reg, statement.baseRegister, encoded, error);
+            }
+            else
+            {
+                encodedOk = cpu_.encoder()->encode_scaled_memory_load(
+                    statement.reg, statement.baseRegister, statement.indexRegister,
+                    statement.addressScale, encoded, error);
+            }
+
+            if (!encodedOk)
                 return fail(statement, error);
 
             for (const auto &part : encoded)

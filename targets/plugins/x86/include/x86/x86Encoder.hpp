@@ -47,6 +47,13 @@ public:
         std::vector<std::vector<std::uint8_t>>& bytes,
         std::string& error
     ) const;
+    bool encode_scaled_memory_load(
+    const std::string &dest,
+    const std::string &base,
+    const std::string &index,
+    unsigned scale,
+    std::vector<std::vector<std::uint8_t>> &bytes,
+    std::string &error) const;
     bool encode_short_jump(
         std::int64_t displacement,
         std::vector<std::uint8_t>& bytes,

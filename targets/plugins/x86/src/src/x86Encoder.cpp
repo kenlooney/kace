@@ -329,10 +329,9 @@ bool X86Encoder::encode_memory_register(
         // Build the ModR/M byte for memory addressing
         bytes.push_back({0x8B});
         bytes.push_back({static_cast<std::uint8_t>((destId << 3) | sourceId)});
-        
-        if(sourceId == 4)
-            bytes.push_back({0x24}); // SIB: no index, ESP base
 
+        if (sourceId == 4)
+            bytes.push_back({0x24}); // SIB: no index, ESP base
 
         error.clear();
         return true;
@@ -356,10 +355,10 @@ bool X86Encoder::encode_memory_register(
         bytes.push_back({0x48}); // REX.W: 64-bit operand
         bytes.push_back({0x8B});
         bytes.push_back({static_cast<std::uint8_t>((destId << 3) | sourceId)});
-        
-        if(sourceId == 4)
+
+        if (sourceId == 4)
             bytes.push_back({0x24}); // SIB: no index, RSP base
-        
+
         error.clear();
         return true;
 
@@ -370,6 +369,118 @@ bool X86Encoder::encode_memory_register(
     }
 
     error = "Memory encoding is not yet supported in this mode";
+    return false;
+}
+
+bool X86Encoder::encode_scaled_memory_load(
+    const std::string &dest,
+    const std::string &base,
+    const std::string &index,
+    unsigned scale,
+    std::vector<std::vector<std::uint8_t>> &bytes,
+    std::string &error) const
+{
+    // Scaled memory load encoding logic here
+    unsigned scaleBits = 0;
+    switch (scale)
+    {
+    case 1:
+        scaleBits = 0;
+        break;
+    case 2:
+        scaleBits = 1;
+        break;
+    case 4:
+        scaleBits = 2;
+        break;
+    case 8:
+        scaleBits = 3;
+        break;
+    default:
+        error = "Scale must be 1, 2, 4, or 8";
+        return false;
+    }
+
+    X86Register *destReg = cpu_.registers().getRegisterByName(dest);
+    if (!destReg)
+    {
+        error = "Invalid destination register for memory encoding";
+        return false;
+    }
+    X86Register *baseReg = cpu_.registers().getRegisterByName(base);
+    if (!baseReg)
+    {
+        error = "Invalid base register for memory encoding";
+        return false;
+    }
+    X86Register *indexReg = cpu_.registers().getRegisterByName(index);
+    if (!indexReg)
+    {
+        error = "Invalid index register for memory encoding";
+        return false;
+    }
+    int destId = destReg->getGroupId();
+    int baseId = baseReg->getGroupId();
+    int indexId = indexReg->getGroupId();
+
+    if (destId < 0 || destId > 7 ||
+        baseId < 0 || baseId > 7 ||
+        indexId < 0 || indexId > 7 ||
+        baseId == 5 || indexId == 4)
+    {
+        error = "Unsupported register for scaled memory encoding";
+        return false;
+    }
+
+    if (cpu_.getMode() == X86Mode::Bits32)
+    {
+        // Ensure that the registers have 32-bit width in 32-bit mode
+        if (!destReg->hasWidth(dest, 32) ||
+            !baseReg->hasWidth(base, 32) ||
+            !indexReg->hasWidth(index, 32))
+        {
+            error = "Expected 32-bit destination, base, and index registers";
+            return false;
+        }
+        // Encode the scaled memory load instruction in 32-bit mode
+        // Construct the ModR/M and SIB bytes for the scaled memory load
+        // ModR/M byte: [mod(2) reg(3) r/m(3)]
+        // SIB byte: [scale(2) index(3) base(3)]
+        // Push the opcode and ModR/M and SIB bytes onto the instruction stream
+        bytes.push_back({0x8B});
+        bytes.push_back({static_cast<std::uint8_t>((destId << 3) | 0x04)});
+        bytes.push_back({static_cast<std::uint8_t>(
+            (scaleBits << 6) | (indexId << 3) | baseId)});
+
+        error.clear();
+        return true;
+    }
+    if (cpu_.getMode() == X86Mode::Bits64)
+    {
+        // Ensure that the registers have 64-bit width in 64-bit mode
+        if (!destReg->hasWidth(dest, 64) ||
+            !baseReg->hasWidth(base, 64) ||
+            !indexReg->hasWidth(index, 64))
+        {
+            error = "Expected 64-bit destination, base, and index registers";
+            return false;
+        }
+        // Encode the scaled memory load instruction in 64-bit mode
+        // Construct the ModR/M and SIB bytes for the scaled memory load
+        // ModR/M byte: [mod(2) reg(3) r/m(3)]
+        // SIB byte: [scale(2) index(3) base(3)]
+        // Push the opcode and ModR/M and SIB bytes onto the instruction stream
+        bytes.push_back({0x48}); // REX prefix for 64-bit mode (if needed)
+        bytes.push_back({0x8B});
+        bytes.push_back({static_cast<std::uint8_t>((destId << 3) | 0x04)});
+        bytes.push_back({static_cast<std::uint8_t>(
+            (scaleBits << 6) | (indexId << 3) | baseId)});
+
+        error.clear();
+        return true;
+    }
+
+    error = "Scaled memory load encoding is not yet implemented";
     return false;
 }
 
