@@ -78,8 +78,10 @@ bool test_memory_load_encoding() {
              {X86Mode::Bits16, "dx", "si", {0x8B, 0x14}},
              {X86Mode::Bits16, "di", "di", {0x8B, 0x3D}},
              {X86Mode::Bits32, "eax", "ebx", {0x8B, 0x03}},
+             {X86Mode::Bits32, "eax", "esp", {0x8B, 0x04, 0x24}},
              {X86Mode::Bits32, "edi", "esi", {0x8B, 0x3E}},
              {X86Mode::Bits64, "rax", "rbx", {0x48, 0x8B, 0x03}},
+             {X86Mode::Bits64, "rax", "rsp", {0x48, 0x8B, 0x04, 0x24}},
              {X86Mode::Bits64, "rdi", "rax", {0x48, 0x8B, 0x38}}}) {
         cpu.setMode(test.mode);
         std::vector<std::vector<std::uint8_t>> parts;
@@ -113,9 +115,7 @@ bool test_memory_load_encoding() {
     }
     for (const auto& test : {
              Case{X86Mode::Bits16, "ax", "bp", {}},
-             {X86Mode::Bits32, "eax", "esp", {}},
              {X86Mode::Bits32, "eax", "ebp", {}},
-             {X86Mode::Bits64, "rax", "rsp", {}},
              {X86Mode::Bits64, "rax", "rbp", {}},
              {X86Mode::Bits64, "r8", "rax", {}},
              {X86Mode::Bits32, "ax", "ebx", {}}}) {
@@ -129,6 +129,15 @@ bool test_memory_load_encoding() {
         }
     }
     cpu.setMode(X86Mode::Bits64);
+    {
+        const std::vector<std::uint8_t> invalidSib{0x48, 0x8B, 0x04, 0x20};
+        std::size_t offset = 0;
+        std::string text;
+        if (cpu.decoder()->decode(invalidSib, offset, text) || offset != 0) {
+            std::cerr << "Unsupported SIB was accepted\n";
+            return false;
+        }
+    }
     const std::vector<std::uint8_t> unprefixed{0x8B, 0x03};
     std::size_t offset = 0;
     std::string text;

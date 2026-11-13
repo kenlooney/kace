@@ -321,8 +321,7 @@ bool X86Encoder::encode_memory_register(
             return false;
         }
         if (destId < 0 || destId > 7 ||
-            sourceId < 0 || sourceId > 7 ||
-            sourceId == 4 || sourceId == 5)
+            sourceId < 0 || sourceId > 7 || sourceId == 5)
         {
             error = "Unsupported register for 32-bit memory encoding";
             return false;
@@ -330,6 +329,11 @@ bool X86Encoder::encode_memory_register(
         // Build the ModR/M byte for memory addressing
         bytes.push_back({0x8B});
         bytes.push_back({static_cast<std::uint8_t>((destId << 3) | sourceId)});
+        
+        if(sourceId == 4)
+            bytes.push_back({0x24}); // SIB: no index, ESP base
+
+
         error.clear();
         return true;
     }
@@ -343,7 +347,7 @@ bool X86Encoder::encode_memory_register(
         }
         if (destId < 0 || destId > 7 ||
             sourceId < 0 || sourceId > 7 ||
-            sourceId == 4 || sourceId == 5)
+            sourceId == 5)
         {
             error = "Unsupported register for 64-bit memory encoding";
             return false;
@@ -352,6 +356,10 @@ bool X86Encoder::encode_memory_register(
         bytes.push_back({0x48}); // REX.W: 64-bit operand
         bytes.push_back({0x8B});
         bytes.push_back({static_cast<std::uint8_t>((destId << 3) | sourceId)});
+        
+        if(sourceId == 4)
+            bytes.push_back({0x24}); // SIB: no index, RSP base
+        
         error.clear();
         return true;
 

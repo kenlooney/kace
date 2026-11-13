@@ -473,6 +473,14 @@ bool X86Decoder::decode_memory_register(
     if(mod != 0)
         return false; // Only support mod == 0 for now
 
+    bool hasSib = mode() != X86Mode::Bits16 && memoryCode == 4;
+    if(hasSib)
+    {
+        if(bytes.size() - opcodeOffset < 3 ||
+           bytes[opcodeOffset + 2] != 0x24)
+            return false; // Invalid or missing SIB byte
+    }
+
     const X86Register *destReg = cpu_.registers().getRegisterById(destId);
     if(!destReg)
         return false; // Invalid destination register ID
@@ -519,6 +527,7 @@ bool X86Decoder::decode_memory_register(
             case 1: baseName = "ecx"; break;
             case 2: baseName = "edx"; break;
             case 3: baseName = "ebx"; break;
+            case 4: baseName = "esp"; break;
             case 6: baseName = "esi"; break;
             case 7: baseName = "edi"; break;
             default: return false; // Invalid memory code
@@ -532,6 +541,7 @@ bool X86Decoder::decode_memory_register(
             case 1: baseName = "rcx"; break;
             case 2: baseName = "rdx"; break;
             case 3: baseName = "rbx"; break;
+            case 4: baseName = "rsp"; break;
             case 6: baseName = "rsi"; break;
             case 7: baseName = "rdi"; break;
             default: return false; // Invalid memory code
@@ -539,6 +549,6 @@ bool X86Decoder::decode_memory_register(
     }
 
     text = "mov " + *destName + ", [" + baseName + "]";
-    offset = opcodeOffset + 2; // Update offset to point after the decoded instruction
+    offset = opcodeOffset + 2 + (hasSib ? 1 : 0); // Update offset to account for optional SIB byte
     return true; // Successfully decoded instruction
 }
