@@ -69,7 +69,8 @@ public:
         add_alias("jnz", {"jnz"});
         add_alias("jc", {"jc"});
         add_alias("jnc", {"jnc"});
-        
+        add_alias("int", {"int"});
+        add_alias("hlt", {"hlt"});
        
     }
     bool is_keyword(const std::string& symbol) const {

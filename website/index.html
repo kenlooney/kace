@@ -139,6 +139,13 @@ byte 10 / 0
           ^</code></pre>
           <p>Division and modulo by zero point to the divisor; arithmetic overflow and negative subtraction
             point to the start of the expression. Other errors do not yet all include a source span.</p>
+          <p>Request a software interrupt with <code>int</code> (or <code>interrupt</code>) and use
+            <code>hlt</code> (or <code>halt</code>) for the x86 halt instruction:</p>
+          <pre class="directive-example"><code>int 0x21  ; CD 21
+halt      ; F4</code></pre>
+          <p>Interrupt vectors are integer literals from 0 through 255; their meaning depends on the
+            execution environment. Disassembly uses <code>int</code> and <code>hlt</code> and displays
+            the interrupt vector in decimal. The halt instruction requires appropriate CPU privileges at runtime.</p>
           <p>The KASM CLI can also disassemble supported x86 instructions into a <code>.dism</code> file.
             Assembly saves labels, source locations, and byte ranges in a matching <code>.sym</code> file.
             The disassembler can restore short- and near-jump targets and show source locations for matching
@@ -222,7 +229,7 @@ byte 3</code></pre>
               <!-- Add more CPU plugins as list items here. -->
               <li>
                 <div><strong>x86</strong><span>DEFAULT CPU</span></div>
-                <p>The assembler supports <code>nop</code>, short unconditional and conditional jumps, mode-aware near jumps, and 16-bit far jumps. The CLI can disassemble
+                <p>The assembler supports <code>nop</code>, <code>int</code>, <code>hlt</code>, short unconditional and conditional jumps, mode-aware near jumps, and 16-bit far jumps. The CLI can disassemble
                   supported immediate moves, register-to-register moves, and those jump forms. Conditional jumps disassemble with numeric displacements.</p>
                 <p>Source statements <code>code16</code>, <code>code32</code>, and <code>code64</code> select the mode for subsequent near-jump assembly. Near jumps use a 16-bit displacement in 16-bit mode and a 32-bit displacement in 32- and 64-bit modes. The binary does not record mode changes for disassembly.</p>
                 <p>The x86 register file groups overlapping names such as <code>rax</code>, <code>eax</code>, <code>ax</code>, <code>al</code>, and <code>ah</code>. The framework exposes register files while the plugin supplies x86-specific widths and encoding IDs.</p>

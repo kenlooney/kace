@@ -15,6 +15,7 @@
  */
 #include <x86/x86.hpp>
 #include <x86/x86Registers.hpp>
+#include <kace/integers.hpp>
 
 X86Mode X86Encoder::mode() const
 {
@@ -188,7 +189,7 @@ bool X86Encoder::encode_register(
             error = "Expected two 16-bit registers";
             return false;
         }
-       
+
         if (sourceId < 8 && destId < 8)
         {
 
@@ -208,14 +209,14 @@ bool X86Encoder::encode_register(
             error = "Expected two 32-bit registers";
             return false;
         }
-        if(sourceId >= 8 || destId >= 8)
+        if (sourceId >= 8 || destId >= 8)
         {
             error = "Unsupported 32-bit register encoding";
             return false;
         }
         bytes.push_back({0x89});
         bytes.push_back({static_cast<std::uint8_t>(0xC0 | (sourceId << 3) | destId)});
-        
+
         return true;
     }
     break;
@@ -227,7 +228,7 @@ bool X86Encoder::encode_register(
             error = "Expected two 64-bit registers";
             return false;
         }
-        if(sourceId >= 8 || destId >= 8)
+        if (sourceId >= 8 || destId >= 8)
         {
             error = "Unsupported 64-bit register encoding";
             return false;
@@ -236,7 +237,6 @@ bool X86Encoder::encode_register(
         bytes.push_back({0x89});
         bytes.push_back({static_cast<std::uint8_t>(0xC0 | (sourceId << 3) | destId)});
         return true;
-
     }
     break;
     default:
@@ -244,6 +244,124 @@ bool X86Encoder::encode_register(
         return false;
     }
     error = "Unsupported register instruction encoding";
+    return false;
+}
+
+bool X86Encoder::encode_memory_register(
+    const std::string &name,
+    const std::string &dest,
+    const std::string &source,
+    std::vector<std::vector<std::uint8_t>> &bytes,
+    std::string &error) const
+{
+    if (name != "mov")
+    {
+        error = "Unsupported memory-register instruction";
+        return false;
+    }
+    X86Register *destReg = cpu_.registers().getRegisterByName(dest);
+    if (!destReg)
+    {
+        error = "Invalid destination register for memory encoding";
+        return false;
+    }
+    X86Register *srcReg = cpu_.registers().getRegisterByName(source);
+    if (!srcReg)
+    {
+        error = "Invalid source register for memory encoding";
+        return false;
+    }
+    int destId = destReg->getGroupId();
+    int sourceId = srcReg->getGroupId();
+
+    // Memory encoding logic here
+    switch (cpu_.getMode())
+    {
+    case X86Mode::Bits16:
+    {
+        // 16-bit memory encoding logic here
+        if (!destReg->hasWidth(dest, 16) || !srcReg->hasWidth(source, 16))
+        {
+            error = "Expected two 16-bit registers";
+            return false;
+        }
+        std::uint8_t memoryCode = 0;
+        if (source == "bx")
+            memoryCode = 0x07; // encoding for BX register
+        else if (source == "si")
+            memoryCode = 0x04; // encoding for SI register
+        else if (source == "di")
+            memoryCode = 0x05; // encoding for DI register
+        else
+        {
+            error = "Unsupported source register for 16-bit memory encoding";
+            return false;
+        }
+
+        // Check if the destination register is valid
+        if (destId < 0 || destId > 7)
+        {
+            error = "Unsupported destination register";
+            return false;
+        }
+
+        // Build the ModR/M byte for memory addressing
+        bytes.push_back({0x8B});
+        bytes.push_back({static_cast<std::uint8_t>((destId << 3) | memoryCode)});
+        error.clear();
+        return true;
+    }
+    break;
+    case X86Mode::Bits32:
+    {
+        // 32-bit memory encoding logic here
+        if (!destReg->hasWidth(dest, 32) || !srcReg->hasWidth(source, 32))
+        {
+            error = "Expected two 32-bit registers";
+            return false;
+        }
+        if (destId < 0 || destId > 7 ||
+            sourceId < 0 || sourceId > 7 ||
+            sourceId == 4 || sourceId == 5)
+        {
+            error = "Unsupported register for 32-bit memory encoding";
+            return false;
+        }
+        // Build the ModR/M byte for memory addressing
+        bytes.push_back({0x8B});
+        bytes.push_back({static_cast<std::uint8_t>((destId << 3) | sourceId)});
+        error.clear();
+        return true;
+    }
+    break;
+    case X86Mode::Bits64:
+        // 64-bit memory encoding logic here
+        if (!destReg->hasWidth(dest, 64) || !srcReg->hasWidth(source, 64))
+        {
+            error = "Expected two 64-bit registers";
+            return false;
+        }
+        if (destId < 0 || destId > 7 ||
+            sourceId < 0 || sourceId > 7 ||
+            sourceId == 4 || sourceId == 5)
+        {
+            error = "Unsupported register for 64-bit memory encoding";
+            return false;
+        }
+        // Build the ModR/M byte for memory addressing
+        bytes.push_back({0x48}); // REX.W: 64-bit operand
+        bytes.push_back({0x8B});
+        bytes.push_back({static_cast<std::uint8_t>((destId << 3) | sourceId)});
+        error.clear();
+        return true;
+
+        break;
+    default:
+        error = "Unsupported CPU mode for memory encoding";
+        return false;
+    }
+
+    error = "Memory encoding is not yet supported in this mode";
     return false;
 }
 
@@ -329,6 +447,42 @@ bool X86Encoder::encode_conditional_jump(
 
     bytes.push_back(opcode);
     bytes.push_back(static_cast<std::uint8_t>(displacement));
+    error.clear();
+    return true;
+}
+
+bool X86Encoder::encode_interrupt(
+    const std::string &interruptNumber,
+    std::vector<std::uint8_t> &bytes,
+    std::string &error) const
+{
+    if (interruptNumber.empty())
+    {
+        error = "Interrupt number is required";
+        return false;
+    }
+    std::uint64_t intNum = 0;
+    if (!parse_integer(interruptNumber, intNum))
+    {
+        error = "Invalid interrupt number";
+        return false;
+    }
+    if (intNum > 255)
+    {
+        error = "Interrupt number must fit in 8 bits";
+        return false;
+    }
+    bytes.push_back(0xCD); // INT opcode
+    bytes.push_back(static_cast<std::uint8_t>(intNum));
+    error.clear();
+    return true;
+}
+
+bool X86Encoder::encode_halt(
+    std::vector<std::uint8_t> &bytes,
+    std::string &error) const
+{
+    bytes.push_back(0xF4); // HLT opcode
     error.clear();
     return true;
 }

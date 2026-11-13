@@ -115,7 +115,7 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
                                JumpKind::Short, statement.sourceName, statement.name()},
                               current_mode});
             output.insert(output.end(), 2, 0);
-            //NEW
+            // NEW
             recordBytes();
             continue;
         }
@@ -136,12 +136,48 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             continue;
         }
 
+        if (statement.has_kind("Interrupt"))
+        {
+            std::vector<std::uint8_t> encoded;
+            if (!cpu_.encoder()->encode_interrupt(statement.interruptNumber, encoded, error))
+                return fail(statement, error);
+            output.insert(output.end(), encoded.begin(), encoded.end());
+            recordBytes();
+            continue;
+        }
+
+        if (statement.has_kind("Halt"))
+        {
+            std::vector<std::uint8_t> encoded;
+            if (!cpu_.encoder()->encode_halt(encoded, error))
+                return fail(statement, error);
+            output.insert(output.end(), encoded.begin(), encoded.end());
+            recordBytes();
+            continue;
+        }
+
         if (statement.has_kind("JumpFar"))
         {
             std::vector<std::uint8_t> encoded;
             if (!cpu_.encoder()->encode_far_jump(statement.farSegment, statement.farOffset, encoded, error))
                 return fail(statement, error);
             output.insert(output.end(), encoded.begin(), encoded.end());
+            recordBytes();
+            continue;
+        }
+
+        if (statement.moveKind == MoveKind::MemoryToRegister)
+        {
+            cpu_.setMode(current_mode);
+            std::vector<std::vector<std::uint8_t>> encoded;
+
+            if (!cpu_.encoder()->encode_memory_register(
+                    statement.name(), statement.reg, statement.baseRegister, encoded, error))
+                return fail(statement, error);
+
+            for (const auto &part : encoded)
+                output.insert(output.end(), part.begin(), part.end());
+
             recordBytes();
             continue;
         }
@@ -168,7 +204,7 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             {
                 output.insert(output.end(), part.begin(), part.end());
             }
-            //NEW
+            // NEW
             recordBytes();
             continue;
         }
@@ -185,7 +221,7 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
             if (count > 1000000)
                 return fail(statement, "Repeat count exceeds the limit");
             output.insert(output.end(), static_cast<std::size_t>(count), byte);
-            //NEW
+            // NEW
             recordBytes();
             continue;
         }
@@ -198,9 +234,9 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
         {
             return fail(statement, "Unsupported instruction or operands: " + statement.name());
         }
-        //NEW
+        // NEW
         output.push_back(byte);
-         recordBytes();
+        recordBytes();
     }
     std::cout << "First pass complete" << std::endl;
     if (output.size() > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()))
