@@ -97,11 +97,11 @@ public:
         const std::string& symbol,
         const std::string& value
     );
-    bool parse_statement(Statement& statement, std::string& error);
+    bool parse_statement(Statement& statement, std::string& error, Span* errorSpan = nullptr);
     bool run(std::uint64_t& value, std::string& error, Span* errorSpan = nullptr);
-    bool number(std::size_t& node, std::string& error);
-    bool sum(std::size_t& node, std::string& error);
-    bool product(std::size_t& node, std::string& error);
+    bool number(std::size_t& node, std::string& error, Span* errorSpan = nullptr);
+    bool sum(std::size_t& node, std::string& error, Span* errorSpan = nullptr);
+    bool product(std::size_t& node, std::string& error, Span* errorSpan = nullptr);
     bool parse_expression_tree(Expression& expression, std::string& error);
     
     bool parse_expression(Expression& expression, std::string& error);
@@ -111,7 +111,7 @@ public:
         std::string& error,
         Span* errorSpan = nullptr
     );
-    bool parse_expression(std::uint64_t& value, std::string& error);
+    bool parse_expression(std::uint64_t& value, std::string& error, Span* errorSpan = nullptr);
     bool evaluate(const Expression& expression, std::size_t node, std::uint64_t& value, std::string& error, const PositionContext* positions = nullptr, Span* errorSpan = nullptr);
     OperatorTable ops_table;
     KeywordTable keywords_table;

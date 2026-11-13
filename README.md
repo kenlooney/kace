@@ -28,6 +28,7 @@ assembly concepts.
 - Expression parsing with operator precedence and grouping
 - AST-backed expression evaluation
 - Multiline source parsing with line-aware diagnostics
+- Source spans on expression nodes and caret diagnostics for supported arithmetic errors
 - Byte definitions with `byte`, `definebyte`, or `db`, including:
 
   ```asm
@@ -80,6 +81,23 @@ From a Windows Debug build, assemble it with:
 The output is the raw byte sequence `90 05 07 90`. The CPU defaults to
 `x86`; use `-c` or `--cpu` to select a plugin. Run `kasm --help` for CLI
 options. The plugin and shared libraries must be next to the executable.
+
+### Expression diagnostics
+
+KASM can show the source line and a caret when an expression has an arithmetic
+error. For example, `byte 10 / 0` produces:
+
+```text
+example.asm:1: Division by zero
+byte 10 / 0
+          ^
+```
+
+Division and modulo by zero point to the divisor. Addition and multiplication
+overflow and subtraction that would produce a negative value point to the start
+of the expression. Other errors do not yet all supply a source span. The KACE
+expression evaluator can return these spans to other consumers; KASM formats
+the source line and caret in its error message.
 
 ## Supported directives
 

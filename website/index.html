@@ -132,6 +132,13 @@ done:
           <p>This assembles to <code>74 01 90 75 FB</code>. The conditions check flags set by earlier
             instructions, and the target must be within the short jump's signed-byte range. Conditional
             disassembly currently shows canonical names and numeric displacements, such as <code>jz 1</code>.</p>
+          <p>When an expression has a supported arithmetic error, KASM can show the source line and point
+            to the problem. For example:</p>
+          <pre class="directive-example"><code>example.asm:1: Division by zero
+byte 10 / 0
+          ^</code></pre>
+          <p>Division and modulo by zero point to the divisor; arithmetic overflow and negative subtraction
+            point to the start of the expression. Other errors do not yet all include a source span.</p>
           <p>The KASM CLI can also disassemble supported x86 instructions into a <code>.dism</code> file.
             Assembly saves labels, source locations, and byte ranges in a matching <code>.sym</code> file.
             The disassembler can restore short- and near-jump targets and show source locations for matching
