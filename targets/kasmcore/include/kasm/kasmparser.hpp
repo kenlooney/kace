@@ -345,6 +345,23 @@ public:
             if (statement.name() == "mov")
             {
                 statement.moveKind = MoveKind::ImmediateToRegister;
+                
+                // move/copy/mov ax, [bx]
+                if(tokens.size() == 6 &&
+                   tokens[1].kind == "identifier" &&
+                   tokens[2].text == "," &&
+                   tokens[3].text == "[" &&
+                   tokens[4].kind == "identifier" &&
+                   tokens[5].text == "]") {
+
+                    // Memory load
+                    statement.moveKind = MoveKind::MemoryToRegister;
+                    statement.reg = tokens[1].text; // Destination register
+                    statement.baseRegister = tokens[4].text; // Base register in memory operand
+                    statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
+                    continue;
+                }
+                
                 // move/copy/mov <expression> into <register>
                 if (tokens.size() < 4)
                 {

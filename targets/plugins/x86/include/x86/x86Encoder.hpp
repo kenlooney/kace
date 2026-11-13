@@ -40,6 +40,13 @@ public:
         std::vector<std::vector<std::uint8_t>>& bytes,
         std::string& error
     ) const;
+    bool encode_memory_register(
+        const std::string& name,
+        const std::string &dest,
+        const std::string &source,
+        std::vector<std::vector<std::uint8_t>>& bytes,
+        std::string& error
+    ) const;
     bool encode_short_jump(
         std::int64_t displacement,
         std::vector<std::uint8_t>& bytes,

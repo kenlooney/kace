@@ -57,7 +57,9 @@ bool X86Decoder::decode(
             return false;
         if (bytes[offset + 1] == 0x89)
             return decode_register(bytes, offset, text);
-
+        if (bytes[offset + 1] == 0x8B)
+            return decode_memory_register(bytes, offset, text);
+        
         return decode_immediate(bytes, offset, text);
     }
     case 0xEB:
@@ -77,6 +79,8 @@ bool X86Decoder::decode(
         return decode_interrupt(bytes, offset, text);
     case 0xF4:
         return decode_halt(bytes, offset, text);
+    case 0x8B:
+        return decode_memory_register(bytes, offset, text);
 
     default:
         return false;
@@ -426,4 +430,115 @@ bool X86Decoder::decode_interrupt(const std::vector<std::uint8_t> &bytes, std::s
     offset += 2;
     text = "int " + std::to_string(intNum);
     return true;
+}
+
+bool X86Decoder::decode_memory_register(
+    const std::vector<std::uint8_t> &bytes,
+    std::size_t &offset,
+    std::string &text) const
+{
+    // Memory register decoding logic here
+
+   // Check for REX.W prefix in 64-bit mode
+   if(offset >= bytes.size())
+       return false;
+
+    std::size_t opcodeOffset = offset;
+    bool hasRexW = false;
+
+
+    if(mode() == X86Mode::Bits64 && bytes[offset] == 0x48)
+    {
+        hasRexW = true;
+        opcodeOffset = offset + 1;
+    }
+
+    // Check for MOV r64, r/m64 opcode (0x8B) after REX.W prefix if present
+    if(bytes.size() - opcodeOffset < 2 || bytes[opcodeOffset] != 0x8B)
+        return false;
+    
+    // Extract ModR/M byte
+    std::uint8_t modrm = bytes[opcodeOffset + 1];
+
+    // Decode ModR/M byte into its components
+    unsigned mod = (modrm >> 6) & 0x3;
+    // mod: 2 bits specifying addressing mode
+    unsigned destId = (modrm >> 3) & 0x7;
+    // destId: 3 bits specifying the destination register
+    unsigned memoryCode = modrm & 0x7;
+    // memoryCode: 3 bits specifying the memory operand (r/m)
+
+
+    
+    if(mod != 0)
+        return false; // Only support mod == 0 for now
+
+    const X86Register *destReg = cpu_.registers().getRegisterById(destId);
+    if(!destReg)
+        return false; // Invalid destination register ID
+
+    unsigned destWidth = 0;
+
+    switch(mode())
+    {
+        case X86Mode::Bits16:
+            destWidth = 16;
+            break;
+        case X86Mode::Bits32:
+            destWidth = 32;
+            break;
+        case X86Mode::Bits64:
+            destWidth = hasRexW ? 64 : 32;
+            break;
+        default:
+            return false; // Unsupported mode
+    }
+
+    const std::string *destName = destReg->getAliasByWidth(destWidth);
+    if(!destName)
+        return false; // Failed to get destination register name
+
+    std::string baseName;
+
+    if(mode() == X86Mode::Bits16)
+    {
+        switch(memoryCode)
+        {
+            case 4: baseName = "si"; break;
+            case 5: baseName = "di"; break;
+            case 7: baseName = "bx"; break;
+           
+            default: return false; // Invalid memory code
+        }
+    }
+    else if(mode() == X86Mode::Bits32)
+    {
+        switch(memoryCode)
+        {
+            case 0: baseName = "eax"; break;
+            case 1: baseName = "ecx"; break;
+            case 2: baseName = "edx"; break;
+            case 3: baseName = "ebx"; break;
+            case 6: baseName = "esi"; break;
+            case 7: baseName = "edi"; break;
+            default: return false; // Invalid memory code
+        }
+    }
+    else if(mode() == X86Mode::Bits64)
+    {
+        switch(memoryCode)
+        {
+            case 0: baseName = "rax"; break;
+            case 1: baseName = "rcx"; break;
+            case 2: baseName = "rdx"; break;
+            case 3: baseName = "rbx"; break;
+            case 6: baseName = "rsi"; break;
+            case 7: baseName = "rdi"; break;
+            default: return false; // Invalid memory code
+        }
+    }
+
+    text = "mov " + *destName + ", [" + baseName + "]";
+    offset = opcodeOffset + 2; // Update offset to point after the decoded instruction
+    return true; // Successfully decoded instruction
 }
