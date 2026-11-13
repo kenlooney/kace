@@ -75,10 +75,27 @@ bool X86Decoder::decode(
         return decode_register(bytes, offset, text);
     case 0xCD:
         return decode_interrupt(bytes, offset, text);
+    case 0xF4:
+        return decode_halt(bytes, offset, text);
 
     default:
         return false;
     }
+}
+
+bool X86Decoder::decode_halt(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
+{
+    if (offset >= bytes.size())
+        return false;
+
+    if (bytes[offset] == 0xF4)
+    {
+        ++offset;
+        text = "hlt";
+        return true;
+    }
+
+    return false;
 }
 bool X86Decoder::decode_no_operand(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const
 {

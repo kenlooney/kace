@@ -70,6 +70,11 @@ public:
         std::vector<std::uint8_t>& bytes,
         std::string& error
     ) const;
+
+    bool encode_halt(
+        std::vector<std::uint8_t>& bytes,
+        std::string& error
+    ) const;
 private:
     X86& cpu_;
 };

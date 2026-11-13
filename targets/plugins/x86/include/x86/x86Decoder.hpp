@@ -39,6 +39,7 @@ public:
     bool near_jump_displacement(const std::vector<std::uint8_t> &bytes, std::size_t offset,
                                 std::int64_t &displacement) const;
     bool decode_interrupt(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const;
+    bool decode_halt(const std::vector<std::uint8_t> &bytes, std::size_t &offset, std::string &text) const;
     
     // Return CPU mode
     X86Mode mode() const;

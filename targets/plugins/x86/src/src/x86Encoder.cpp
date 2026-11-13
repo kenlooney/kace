@@ -360,3 +360,12 @@ bool X86Encoder::encode_interrupt(
     error.clear();
     return true;
 }
+
+bool X86Encoder::encode_halt(
+    std::vector<std::uint8_t> &bytes,
+    std::string &error) const
+{
+    bytes.push_back(0xF4); // HLT opcode
+    error.clear();
+    return true;
+}
