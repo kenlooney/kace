@@ -49,6 +49,7 @@ public:
     std::string interruptNumber;
     std::string baseRegister;
     std::string indexRegister;
+    Expression addressExpression;
     bool parse_statement(const std::vector<Token> &tokens, std::string &error) override
     {
         return false;

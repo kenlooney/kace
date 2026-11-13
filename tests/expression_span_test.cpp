@@ -48,5 +48,31 @@ int main() {
         std::cerr << "Position expression span was incorrect\n";
         return 1;
     }
+    KasmLexer addressLexer;
+    const auto addressTokens = addressLexer.tokenize("ebx sum ecx mul 4");
+    KasmParser addressParser(addressTokens);
+    Expression address;
+    if (!addressParser.parse_expression_tree(address, error)) {
+        std::cerr << "Could not parse address expression: " << error << '\n';
+        return 1;
+    }
+    const Node& addressSum = address.nodes[address.root];
+    const Node& base = address.nodes[addressSum.left];
+    const Node& scaledIndex = address.nodes[addressSum.right];
+    const Node& index = address.nodes[scaledIndex.left];
+    const Node& scale = address.nodes[scaledIndex.right];
+    if (addressSum.kind != "+" || base.kind != "identifier" || base.text != "ebx" ||
+        scaledIndex.kind != "*" || index.kind != "identifier" || index.text != "ecx" ||
+        scale.kind != "number" || scale.value != 4) {
+        std::cerr << "Address expression tree was incorrect\n";
+        return 1;
+    }
+    std::uint64_t value = 0;
+    error.clear();
+    if (addressParser.evaluate(address, address.root, value, error) ||
+        error != "Cannot evaluate identifier: ebx") {
+        std::cerr << "Identifier evaluation did not fail safely: " << error << '\n';
+        return 1;
+    }
     return 0;
 }

@@ -111,8 +111,6 @@ public:
                 continue;
             }
 
-           
-
             // Check for directives before identifiers
             if (tokens[0].kind == "directive")
             {
@@ -316,7 +314,7 @@ public:
                 continue;
             }
 
-             // Check for interrupt keyword before identifiers
+            // Check for interrupt keyword before identifiers
             if (statement.name() == "int")
             {
                 if (tokens.size() != 2)
@@ -345,23 +343,46 @@ public:
             if (statement.name() == "mov")
             {
                 statement.moveKind = MoveKind::ImmediateToRegister;
-                
+
+                if (tokens.size() >= 6 &&
+                    tokens[1].kind == "identifier" &&
+                    tokens[2].text == "," &&
+                    tokens[3].text == "[" &&
+                    tokens.back().text == "]")
+                {
+                    // Parse the expression between the brackets.
+                    std::vector<Token> addressTokens(tokens.begin() + 4, tokens.end() - 1);
+                    KasmParser addressParser(addressTokens);
+                    if (!addressParser.parse_expression_tree(statement.addressExpression, error))
+                    {
+                        error = source.name + ":" + std::to_string(line_number) +
+                                ": Failed to parse address expression: " + error;
+                        return false;
+                    }
+                    if (tokens.size() != 6)
+                    {
+                        error = source.name + ":" + std::to_string(line_number) +
+                                ": Complex memory addresses are not yet supported";
+                        return false;
+                    }
+                }
                 // move/copy/mov ax, [bx]
-                if(tokens.size() == 6 &&
-                   tokens[1].kind == "identifier" &&
-                   tokens[2].text == "," &&
-                   tokens[3].text == "[" &&
-                   tokens[4].kind == "identifier" &&
-                   tokens[5].text == "]") {
+                if (tokens.size() == 6 &&
+                    tokens[1].kind == "identifier" &&
+                    tokens[2].text == "," &&
+                    tokens[3].text == "[" &&
+                    tokens[4].kind == "identifier" &&
+                    tokens[5].text == "]")
+                {
 
                     // Memory load
                     statement.moveKind = MoveKind::MemoryToRegister;
-                    statement.reg = tokens[1].text; // Destination register
+                    statement.reg = tokens[1].text;          // Destination register
                     statement.baseRegister = tokens[4].text; // Base register in memory operand
                     statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                     continue;
                 }
-                
+
                 // move/copy/mov <expression> into <register>
                 if (tokens.size() < 4)
                 {
