@@ -46,6 +46,7 @@ public:
     std::uint64_t count = 0;
     Expression countExpression;
     std::size_t column = 0;
+    std::string interruptNumber;
     bool parse_statement(const std::vector<Token> &tokens, std::string &error) override
     {
         return false;

@@ -107,5 +107,18 @@ int main() {
             return 1;
         }
     }
+    source.text = "int 0x21\ninterrupt 0x21\n";
+    if (!parser.parse(source, statements, error) || statements.size() != 2) {
+        std::cerr << "Interrupt parsing failed: " << error << '\n';
+        return 1;
+    }
+    for (const auto& statementPtr : statements) {
+        const auto* statement = dynamic_cast<const KasmStatement*>(statementPtr.get());
+        if (!statement || !statement->has_kind("Interrupt") ||
+            statement->name() != "int" || statement->interruptNumber != "0x21") {
+            std::cerr << "Interrupt or alias parsed incorrectly\n";
+            return 1;
+        }
+    }
     return 0;
 }
