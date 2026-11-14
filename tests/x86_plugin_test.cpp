@@ -65,6 +65,76 @@ bool test_register_file() {
     return true;
 }
 
+bool test_segment_move_encoding() {
+    X86 cpu;
+    cpu.setMode(X86Mode::Bits16);
+    struct Case {
+        const char* segment;
+        const char* reg;
+        bool loadSegment;
+        std::uint8_t opcode;
+        std::uint8_t modrm;
+    };
+    for (const auto& test : {
+             Case{"ds", "ax", true, 0x8E, 0xD8},
+             {"cs", "ax", false, 0x8C, 0xC8},
+             {"es", "di", true, 0x8E, 0xC7},
+             {"ss", "bx", false, 0x8C, 0xD3},
+             {"fs", "cx", true, 0x8E, 0xE1},
+             {"gs", "dx", false, 0x8C, 0xEA}}) {
+        std::vector<std::vector<std::uint8_t>> bytes;
+        std::string error;
+        if (!cpu.encoder()->encode_segment_move(test.segment, test.reg, test.loadSegment, bytes, error) ||
+            bytes != std::vector<std::vector<std::uint8_t>>{{test.opcode}, {test.modrm}}) {
+            std::cerr << "Segment move encoding failed: " << error << '\n';
+            return false;
+        }
+        const std::vector<std::uint8_t> input{0x90, test.opcode, test.modrm};
+        std::size_t offset = 1;
+        std::string text;
+        const std::string expected = std::string("mov ") +
+            (test.loadSegment ? test.segment : test.reg) + ", " +
+            (test.loadSegment ? test.reg : test.segment);
+        if (!cpu.decoder()->decode(input, offset, text) || offset != input.size() || text != expected) {
+            std::cerr << "Segment move decoding failed: " << text << '\n';
+            return false;
+        }
+        const std::vector<std::uint8_t> truncated{0x90, test.opcode};
+        offset = 1;
+        if (cpu.decoder()->decode(truncated, offset, text) || offset != 1) {
+            std::cerr << "Truncated segment move accepted\n";
+            return false;
+        }
+    }
+    for (const auto& input : {std::vector<std::uint8_t>{0x8E, 0xC8},
+                              std::vector<std::uint8_t>{0x8C, 0xF0},
+                              std::vector<std::uint8_t>{0x8E, 0x00}}) {
+        std::size_t offset = 0;
+        std::string text;
+        if (cpu.decoder()->decode(input, offset, text) || offset != 0) {
+            std::cerr << "Invalid segment move decoded\n";
+            return false;
+        }
+    }
+    for (const auto& test : {
+             Case{"cs", "ax", true, 0, 0}, {"invalid", "ax", true, 0, 0},
+             {"ds", "eax", true, 0, 0}, {"ds", "r8w", true, 0, 0}}) {
+        std::vector<std::vector<std::uint8_t>> bytes{{0x90}};
+        std::string error;
+        if (cpu.encoder()->encode_segment_move(test.segment, test.reg, test.loadSegment, bytes, error) ||
+            bytes != std::vector<std::vector<std::uint8_t>>{{0x90}} || error.empty()) {
+            std::cerr << "Invalid segment move accepted\n";
+            return false;
+        }
+    }
+    cpu.setMode(X86Mode::Bits32);
+    std::vector<std::vector<std::uint8_t>> bytes{{0x90}};
+    std::string error;
+    if (cpu.encoder()->encode_segment_move("ds", "ax", true, bytes, error) ||
+        bytes != std::vector<std::vector<std::uint8_t>>{{0x90}} || error.empty()) return false;
+    return true;
+}
+
 bool test_displaced_memory_encoding() {
     X86 cpu;
     struct Case {
@@ -621,6 +691,7 @@ bool test_near_modes() {
 }
 
 int main() {
+    if (!test_segment_move_encoding()) return 1;
     if (!test_displaced_memory_encoding()) return 1;
     if (!test_scaled_memory_encoding()) return 1;
     if (!test_memory_load_encoding()) return 1;

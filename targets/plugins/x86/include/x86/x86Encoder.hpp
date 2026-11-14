@@ -57,6 +57,14 @@ public:
     std::vector<std::vector<std::uint8_t>> &bytes,
     std::string &error) const;
 
+    bool encode_segment_move(
+        const std::string &segment,
+        const std::string &reg,
+        bool loadSegment,
+        std::vector<std::vector<std::uint8_t>> &bytes,
+        std::string &error
+    ) const;
+
     bool encode_displaced_memory_load(
     const std::string &dest,
     const std::string &base,
