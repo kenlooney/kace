@@ -19,10 +19,16 @@
 
 enum class MoveKind
 {
+    // Immmediates
     ImmediateToRegister,
+    // Registers
     RegisterToRegister,
-    MemoryToRegister,
     RegisterToMemory,
+    // Memory
+    MemoryToRegister,
+    // Segment
+    SegmentRegisterMove,
+    // None
     None,
 };
 class KasmStatement : public Statement
@@ -56,6 +62,9 @@ public:
     std::int64_t displacement = 0;
     Span targetSpan;
     std::string sourceLine;
+    std::string destinationRegister;
+    std::string sourceRegister;
+
     bool parse_statement(const std::vector<Token> &tokens, std::string &error) override
     {
         return false;
