@@ -16,6 +16,7 @@
 #pragma once
 #include <cstddef>
 #include <string>
+#include "span.hpp"
 
 enum class JumpKind {
     Short,
@@ -30,5 +31,8 @@ struct JumpFixup {
     JumpKind kind = JumpKind::Short;
     std::string sourceName;
     std::string condition;
+    Span span;
+    std::string sourceLine;
+
   
 };

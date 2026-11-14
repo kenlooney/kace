@@ -14,6 +14,7 @@
  * GNU General Public License for more details.
  */
 #pragma once
+#include <kace/span.hpp>
 #include <kace/statement.hpp>
 
 enum class MoveKind
@@ -53,6 +54,8 @@ public:
     unsigned addressScale = 1;
     bool hasDisplacement = false;
     std::int64_t displacement = 0;
+    Span targetSpan;
+    std::string sourceLine;
     bool parse_statement(const std::vector<Token> &tokens, std::string &error) override
     {
         return false;
