@@ -115,7 +115,8 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
         if (statement.has_kind("ConditionalJump"))
         {
             fixups.push_back({{statement.target, offset, statement.line,
-                               JumpKind::Short, statement.sourceName, statement.name()},
+                               JumpKind::Short, statement.sourceName,
+                               statement.name(), statement.targetSpan, statement.sourceLine},
                               current_mode});
             output.insert(output.end(), 2, 0);
             // NEW
@@ -276,12 +277,20 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
         if (!label)
         {
             error = location + "Unknown label: " + fixup.target;
+            if (!fixup.sourceLine.empty() &&
+                fixup.span.end > fixup.span.begin &&
+                fixup.span.begin < fixup.sourceLine.size())
+            {
+                error += "\n" + fixup.sourceLine + "\n";
+                error += std::string(fixup.span.begin, ' ') + "^";
+            }
             return false;
         }
         const std::size_t size = fixup.kind == JumpKind::Near
                                      ? 1 + near_displacement_size(cpu_.getMode())
                                      : 2;
         const auto displacement = static_cast<std::int64_t>(label->offset) - static_cast<std::int64_t>(fixup.offset) - static_cast<std::int64_t>(size);
+
         std::vector<std::uint8_t> encoded;
         bool ok;
         if (!fixup.condition.empty())
@@ -293,6 +302,13 @@ bool X86Assembler::assemble(const std::vector<std::unique_ptr<Statement>> &state
         if (!ok || encoded.size() != size)
         {
             error = location + (error.empty() ? "Invalid jump encoding" : error);
+            if (!fixup.sourceLine.empty() &&
+                fixup.span.end > fixup.span.begin &&
+                fixup.span.begin < fixup.sourceLine.size())
+            {
+                error += "\n" + fixup.sourceLine + "\n";
+                error += std::string(fixup.span.begin, ' ') + "^";
+            }
             return false;
         }
         std::copy(encoded.begin(), encoded.end(), output.begin() + fixup.offset);

@@ -511,8 +511,30 @@ examples/     Example assembly source files
 
 ## Roadmap
 
+### Current development focus
+
+Development is shifting from extending the x86 instruction set to exercising
+and improving KACE with a second ISA plugin, with a MOS 6502-family target under
+consideration. The aim is to explore how the framework, KASM, and plugin
+interfaces can support multiple architectures and assembler languages. The
+second plugin and language support are planned, not yet implemented; their
+exact design and supported ISA will be decided during development.
+
+The current x86 stopping point is segment-register moves: the plugin can encode
+and decode the initial 16-bit register forms, including reads of `cs` and
+the `es`, `ss`, `ds`, `fs`, and `gs` forms. Loading `cs` with `mov` is
+rejected. These codec operations have focused tests, but KASM source parsing
+and assembler dispatch for segment-register moves are not yet connected.
+Additional modes and operand forms remain future work.
+
+The x86 assembler currently consumes `KasmStatement` objects, so a second
+plugin will help identify and improve any language or architecture assumptions
+in that boundary. Supporting another ISA or language will require integration
+work; selecting a plugin alone does not yet supply a new language frontend.
+
 Planned development includes:
 
+- A second ISA plugin and evaluation of multi-ISA and multi-language integration
 - Output for word, double-word, and quad-word data definitions
 - Far-jump support in additional CPU modes and broader label resolution
 - Near conditional jumps and conditional target restoration during disassembly

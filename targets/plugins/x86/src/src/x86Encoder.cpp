@@ -569,6 +569,71 @@ bool X86Encoder::encode_displaced_memory_load(
     return true;
 }
 
+bool X86Encoder::encode_segment_move(
+    const std::string &segment,
+    const std::string &reg,
+    bool loadSegment,
+    std::vector<std::vector<std::uint8_t>> &bytes,
+    std::string &error) const
+{
+    unsigned segmentCode = 0;
+
+    if (segment == "es")
+        segmentCode = 0;
+    else if (segment == "cs")
+        segmentCode = 1;
+    else if (segment == "ss")
+        segmentCode = 2;
+    else if (segment == "ds")
+        segmentCode = 3;
+    else if (segment == "fs")
+        segmentCode = 4;
+    else if (segment == "gs")
+        segmentCode = 5;
+    else
+    {
+        error = "Invalid segment register";
+        return false;
+    }
+    if (loadSegment && segment == "cs")
+    {
+        error = "mov cannot load CS segment";
+        return false;
+    }
+    X86Register *regPtr = cpu_.registers().getRegisterByName(reg);
+
+    if (!regPtr)
+    {
+        error = "Invalid general-purpose register";
+        return false;
+    }
+
+    if (!regPtr->hasWidth(reg, 16) || regPtr->getGroupId() >= 8)
+    {
+        error = "Expected a supported 16-bit general-purpose register";
+        return false;
+    }
+
+    X86Mode mode = cpu_.getMode();
+    if (mode != X86Mode::Bits16)
+    {
+        error = "This segment move form is not yet implemented in this mode";
+        return false;
+    }
+
+    // Encode the segment move instruction
+    std::uint8_t opcode = loadSegment ? 0x8E : 0x8C;
+    unsigned regId = regPtr->getGroupId();
+    // Construct the ModR/M byte for the segment move instruction
+    bytes.push_back({opcode});
+    // Add the ModR/M byte
+    bytes.push_back({static_cast<std::uint8_t>(
+        0xC0 | (segmentCode << 3) | regId)});
+
+    error.clear();
+    return true;
+}
+
 bool X86Encoder::encode_near_jump(
     std::int64_t displacement, std::vector<std::uint8_t> &bytes,
     std::string &error) const

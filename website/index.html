@@ -286,6 +286,15 @@ byte 3</code></pre>
               <li>Select it with <code>--cpu=&lt;name&gt;</code> when producing output.</li>
             </ol>
             <p>The plugin interface and shared statement model are still evolving; plugins must be built against the matching KACE interface.</p>
+            <p class="plugin-label">WHAT'S NEXT</p>
+            <h3>Testing the framework with another ISA.</h3>
+            <p>Development is shifting toward a second CPU plugin, with a MOS 6502-family target under consideration.
+              This work will explore how KACE, KASM, and the plugin interfaces can support multiple architectures
+              and assembler languages. The new plugin and language support are planned and not yet available.</p>
+            <p>The x86 work is paused after implementing and testing the initial 16-bit segment-register move
+              encoder and decoder. KASM source assembly for those moves and additional forms remain to be connected.
+              The current x86 assembler consumes KASM statements, and supporting another language will require
+              further integration work.</p>
           </div>
         </div>
       </div>

@@ -309,6 +309,8 @@ public:
                 }
 
                 statement.target = tokens[1].text;
+                statement.targetSpan = tokens[1].span;
+                statement.sourceLine = line;
                 statement.add_kind("ConditionalJump");
                 statements.push_back(std::make_unique<KasmStatement>(std::move(statement)));
                 continue;

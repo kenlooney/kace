@@ -135,3 +135,10 @@ add_test(
           -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/halt_test
           -P ${CMAKE_CURRENT_SOURCE_DIR}/kasm_halt_cli_test.cmake
 )
+add_test(
+  NAME kasm_conditional_diagnostic_cli_test
+  COMMAND ${CMAKE_COMMAND}
+          -DKASM=$<TARGET_FILE:kasm>
+          -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/conditional_diagnostic_test
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/kasm_conditional_diagnostic_cli_test.cmake
+)

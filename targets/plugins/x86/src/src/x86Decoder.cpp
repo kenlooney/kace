@@ -81,6 +81,9 @@ bool X86Decoder::decode(
         return decode_halt(bytes, offset, text);
     case 0x8B:
         return decode_memory_register(bytes, offset, text);
+    case 0x8C:
+    case 0x8E:
+        return decode_segment_move(bytes, offset, text);
 
     default:
         return false;
@@ -761,5 +764,54 @@ bool X86Decoder::decode_displaced_memory_load(
 
     text += "]";
     offset = displacementOffset + displacementBytes;
+    return true;
+}
+
+bool X86Decoder::decode_segment_move(
+    const std::vector<std::uint8_t> &bytes,
+    std::size_t &offset,
+    std::string &text) const
+{
+    if (mode() != X86Mode::Bits16 ||
+        offset >= bytes.size() ||
+        bytes.size() - offset < 2)
+        return false;
+
+    std::uint8_t opcode = bytes[offset];
+
+    // Segment move instructions have opcodes 0x8C (store segment) and 0x8E (load segment)
+    if (opcode != 0x8C && opcode != 0x8E)
+        return false;
+
+    std::uint8_t modrm = bytes[offset + 1];
+    unsigned mod = (modrm >> 6) & 0x03;
+    unsigned segmentCode = (modrm >> 3) & 0x07;
+    unsigned regId = modrm & 0x07;
+
+    // Only register-direct addressing is allowed for segment moves in 16-bit mode
+    if (mod != 3 || segmentCode > 5)
+        return false;
+
+    // Check for invalid segment load (CS cannot be loaded)
+    if (opcode == 0x8E && segmentCode == 1)
+        return false; // MOV cannot load CS
+
+    const X86Register *reg = cpu_.registers().getRegisterById(regId);
+    if (!reg)
+        return false;
+
+    const std::string *regName = reg->getAliasByWidth(16);
+    if (!regName)
+        return false;
+
+    const char *segmentNames[] = {"es", "cs", "ss", "ds", "fs", "gs"};
+    const char *segmentName = segmentNames[segmentCode];
+
+    if (opcode == 0x8E)
+        text = "mov " + std::string(segmentName) + ", " + *regName;
+    else
+        text = "mov " + *regName + ", " + segmentName;
+
+    offset += 2;
     return true;
 }

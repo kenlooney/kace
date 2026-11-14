@@ -14,14 +14,21 @@
  * GNU General Public License for more details.
  */
 #pragma once
+#include <kace/span.hpp>
 #include <kace/statement.hpp>
 
 enum class MoveKind
 {
+    // Immmediates
     ImmediateToRegister,
+    // Registers
     RegisterToRegister,
-    MemoryToRegister,
     RegisterToMemory,
+    // Memory
+    MemoryToRegister,
+    // Segment
+    SegmentRegisterMove,
+    // None
     None,
 };
 class KasmStatement : public Statement
@@ -53,6 +60,11 @@ public:
     unsigned addressScale = 1;
     bool hasDisplacement = false;
     std::int64_t displacement = 0;
+    Span targetSpan;
+    std::string sourceLine;
+    std::string destinationRegister;
+    std::string sourceRegister;
+
     bool parse_statement(const std::vector<Token> &tokens, std::string &error) override
     {
         return false;

@@ -1,0 +1,17 @@
+file(MAKE_DIRECTORY "${TEST_DIR}")
+set(source "${TEST_DIR}/conditional.asm")
+set(output "${TEST_DIR}/conditional.bin")
+file(WRITE "${source}" "  ifequal missing\n")
+execute_process(COMMAND "${KASM}" -i "${source}" -o "${output}"
+  RESULT_VARIABLE result ERROR_VARIABLE error)
+string(FIND "${error}" "Unknown label: missing\n  ifequal missing\n          ^" found)
+if(result EQUAL 0 OR found EQUAL -1)
+  message(FATAL_ERROR "Missing-label diagnostic is incorrect: ${error}")
+endif()
+file(WRITE "${source}" "  ifequal faraway\nfill 128 byte 0\nfaraway:\nnop\n")
+execute_process(COMMAND "${KASM}" -i "${source}" -o "${output}"
+  RESULT_VARIABLE result ERROR_VARIABLE error)
+string(FIND "${error}" "  ifequal faraway\n          ^" found)
+if(result EQUAL 0 OR found EQUAL -1 OR NOT error MATCHES "out of range")
+  message(FATAL_ERROR "Out-of-range diagnostic is incorrect: ${error}")
+endif()
